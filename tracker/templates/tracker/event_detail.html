@@ -4,7 +4,7 @@
 <p class="crumbs"><a href="{% url 'event_list' %}">Events</a> ›</p>
 <div class="detail-head">
   <div class="eyebrow">
-    <span class="dot c-{{ event.workspace.color }}"></span>{{ event.workspace.name }}
+    <span class="dot c-{{ event.workspace.color }}"></span><span>{{ event.workspace.name }}</span>
     <span class="sep">{{ event.get_kind_display }}</span>
     <span class="pill status-{{ event.status }}">{{ event.status_short }}</span>
   </div>

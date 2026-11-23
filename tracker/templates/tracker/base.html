@@ -10,9 +10,9 @@
   <link rel="icon" href="{% static 'tracker/icons/favicon-32.png' %}" sizes="32x32">
   <link rel="apple-touch-icon" href="{% static 'tracker/icons/apple-touch-icon.png' %}">
   <meta name="mobile-web-app-capable" content="yes">
-  <link rel="stylesheet" href="{% static 'tracker/app.css' %}">
+  <link rel="stylesheet" href="{% static 'tracker/app.css' %}?v={{ asset_version }}">
   <script src="{% static 'tracker/htmx.min.js' %}" defer></script>
-  <script src="{% static 'tracker/app.js' %}" defer></script>
+  <script src="{% static 'tracker/app.js' %}?v={{ asset_version }}" defer></script>
 </head>
 {% with n=request.resolver_match.url_name %}
 <body hx-boost="true" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' class="{% if user.is_authenticated %}has-nav{% else %}no-nav{% endif %}">

@@ -6,7 +6,7 @@
 
   <h2>AI summaries</h2>
   <p class="muted">Uses your own Anthropic API key, only for the summaries you ask for. Anyone else running a copy of this app uses their own key.</p>
-  <p class="muted small">How it's stored: encrypted in the database with a secret from the server's settings file. That keeps it unreadable in database backups and copies, but anyone with full (root) access to the server could still recover it — so also set a monthly spend limit in the Anthropic Console, and remove or rotate the key there if the server is ever compromised.</p>
+<details class="help-box"><summary>How the key is stored</summary>  <p class="muted small">Encrypted in the database with a secret from the server's settings file. That keeps it unreadable in database backups and copies, but anyone with full (root) access to the server could still recover it — so also set a monthly spend limit in the Anthropic Console, and remove or rotate the key there if the server is ever compromised.</p></details>
   <p>Key: {% if s.has_api_key %}<strong>saved</strong> <span class="muted">({{ s.anthropic_key_hint }})</span>{% else %}<strong>not set</strong>{% endif %}</p>
   <form method="post">
     {% csrf_token %}
@@ -36,7 +36,7 @@
   </ul>
 
   <h2 class="mt">Phone app</h2>
-  <p class="muted">On Android, open this site in Chrome and tap <em>Install app</em> (or ⋮ → <em>Add to Home screen</em> → <em>Install</em>). Then in WhatsApp, Outlook or Gmail, long-press a message → <em>Share</em> → <strong>Tasks</strong> to send it to Quick capture.</p>
+<details class="help-box"><summary>How to install and share to it</summary>  <p class="muted">On Android, open this site in Chrome and tap <em>Install app</em> (or ⋮ → <em>Add to Home screen</em> → <em>Install</em>). Then in WhatsApp, Outlook or Gmail, long-press a message → <em>Share</em> → <strong>Tasks</strong> to send it to Quick capture.</p></details>
   <button type="button" class="btn btn-install" data-install hidden>⤓ Install app</button>
 
   <h2 class="mt">Account</h2>

@@ -8,14 +8,14 @@
 </div>
 {% endif %}
 <p class="crumbs"><a href="{{ workspace.get_absolute_url }}">{{ workspace.name }}</a> ›</p>
-<div class="pagehead">
+<div class="pagehead nowrap">
   <div>
     <h1>{{ holder.name }}</h1>
     <p class="sub">{{ holder.get_kind_display }}{% if not holder.active %} · inactive{% endif %}</p>
-    {% include "tracker/partials/contact_links.html" with p=holder %}
   </div>
   <div><a class="btn btn-small" href="{% url 'holder_edit' holder.pk %}">Edit</a></div>
 </div>
+{% include "tracker/partials/contact_links.html" with p=holder %}
 {% if holder.notes %}<p class="muted">{{ holder.notes|linebreaksbr }}</p>{% endif %}
 
 {% if holder.is_group %}
@@ -27,9 +27,8 @@
   {% for c in contacts %}
   <div class="person {% if not c.active %}inactive{% endif %}">
     <div class="person-main">
-      <strong>{{ c.name }}</strong>
+      <strong>{{ c.name }}{% if c.is_primary %} <span class="badge-main">★ Main</span>{% endif %}</strong>
       {% if c.role %}<span class="role">{{ c.role }}</span>{% endif %}
-      {% if c.is_primary %}<span class="badge badge-main">★ Main contact</span>{% endif %}
       {% if not c.active %}<span class="muted">· no longer here</span>{% endif %}
       {% include "tracker/partials/contact_links.html" with p=c %}
       {% if c.notes %}<small class="muted">{{ c.notes }}</small>{% endif %}

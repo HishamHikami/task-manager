@@ -3,7 +3,7 @@
 {% block content %}
 <div class="detail-head">
   <div class="eyebrow">
-    <span class="dot c-{{ task.workspace.color }}"></span>{{ task.workspace.name }}
+    <span class="dot c-{{ task.workspace.color }}"></span><span>{{ task.workspace.name }}</span>
     <span class="sep">{{ task.stage.name }}</span>
     <span class="sep">{{ task.get_my_role_display }}</span>
     {% if task.priority >= 3 %}<span class="pill {% if task.priority >= 4 %}pill-red{% else %}pill-amber{% endif %}">{{ task.get_priority_display }}</span>{% endif %}

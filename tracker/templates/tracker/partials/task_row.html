@@ -3,6 +3,7 @@
   <div class="row-main">
     <span class="row-title">{{ task.title }}</span>
     <span class="row-meta">
+      <span class="pill-inline">{% if task.is_overdue %}<span class="pill pill-red">Overdue · {{ task.due_date|date:"j M" }}</span>{% elif task.follow_up_due %}<span class="pill pill-amber">Follow up</span>{% elif task.due_date and not task.is_closed %}<span class="pill">Due {{ task.due_date|date:"j M" }}</span>{% elif task.follow_up_date and not task.is_closed %}<span class="pill pill-ghost">Check {{ task.follow_up_date|date:"j M" }}</span>{% endif %}</span>
       {% if not hide_ws %}<span class="dot c-{{ task.workspace.color }}" title="{{ task.workspace.name }}"></span>{% endif %}
       {% if not hide_desk %}{% if task.current_holder %}<span>{{ task.desk_name }}</span>{% elif task.with_me %}<span>Me</span>{% endif %}{% endif %}
       {% if task.current_holder and not task.is_closed %}<span class="sep">{{ task.days_with_holder }}d</span>{% endif %}

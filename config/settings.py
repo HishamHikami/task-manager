@@ -117,6 +117,20 @@ STATIC_ROOT = Path(os.environ.get("STATIC_ROOT", BASE_DIR / "staticfiles"))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Version for cache-busting static asset URLs (changes when CSS/JS change).
+def _asset_version():
+    import hashlib
+    h = hashlib.sha256()
+    for name in ("app.css", "app.js"):
+        try:
+            h.update((BASE_DIR / "tracker" / "static" / "tracker" / name).read_bytes())
+        except OSError:
+            pass
+    return h.hexdigest()[:10]
+
+
+ASSET_VERSION = _asset_version()
+
 # Optional separate secret for encrypting the stored AI key. If unset, one is
 # derived from SECRET_KEY (changing SECRET_KEY then means re-entering the AI key).
 FIELD_ENCRYPTION_KEY = os.environ.get("FIELD_ENCRYPTION_KEY", "")

@@ -481,3 +481,26 @@ body.no-nav .container { max-width: 420px; padding-top: 12vh; }
 .fold-card > summary::-webkit-details-marker { display: none; }
 .fold-card > summary h2::after { content: " ›"; color: var(--muted); font-weight: 400; }
 .fold-card[open] > summary h2::after { content: " ⌄"; }
+
+/* Status pill: right side on wide screens, under the title on phones */
+.row-meta .pill-inline { display: none; }
+.row-meta .pill-inline + .sep::before { content: none; }
+.row-meta .pill-inline + .sep { margin-left: 0; }
+@media (max-width: 599px) {
+  .row-side { display: none; }
+  .row-meta .pill-inline { display: inline; }
+  .row-meta .pill-inline:not(:empty) { margin-right: 8px; }
+  .row-meta .pill-inline:not(:empty) + .sep::before { content: "·"; }
+  .row-meta .pill { height: 20px; padding: 0 8px; font-size: .74rem; vertical-align: 1px; }
+  .row { align-items: center; }
+}
+
+.pagehead.nowrap { flex-wrap: nowrap; align-items: flex-start; }
+.pagehead.nowrap + .contactlinks { margin: -8px 0 16px; }
+.badge-main { margin-left: 4px; vertical-align: 1px; font-weight: 500; }
+.contactlinks { row-gap: 0; }
+.copybtn { width: 28px; height: 28px; }
+@media (max-width: 599px) {
+  .person { flex-direction: column; gap: 6px; }
+  .person-actions { flex-direction: row; align-items: center; gap: 16px; }
+}

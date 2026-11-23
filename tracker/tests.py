@@ -174,7 +174,7 @@ class PeopleTests(BaseCase):
         page = self.client.get(self.finance.get_absolute_url())
         self.assertContains(page, "Finance Manager")
         self.assertContains(page, "Accountant")
-        self.assertContains(page, "★ Main contact")
+        self.assertContains(page, "★ Main")
         ahmed = Contact.objects.get(name="Ahmed")
         self.client.post(reverse("contact_edit", args=[ahmed.pk]),
                          {"name": "Ahmed", "role": "Senior Accountant", "active": "on"})
@@ -536,8 +536,7 @@ class EventTests(BaseCase):
         self.assertContains(self.client.get(reverse("event_list")), "Annual community lecture")
         dash = self.client.get(reverse("dashboard"))
         self.assertContains(dash, "Coming up")
-        self.assertContains(dash, "Invites to answer")
-        self.assertContains(dash, '<span class="stat-n warn">1</span><span class="stat-l">Invites to answer')
+        self.assertContains(dash, '<span class="stat-n warn">1</span><span class="stat-l">Invites')
         self.assertContains(self.client.get(reverse("event_list") + "?show=invites"), "Annual community lecture")
 
     def test_status_change(self):
@@ -778,3 +777,13 @@ class PWATests(TestCase):
         resp = self.client.get("/capture/?text=hello")
         self.assertEqual(resp.status_code, 302)
         self.assertIn("/login/?next=/capture/%3Ftext%3Dhello", resp["Location"])
+
+
+class AssetVersionTests(BaseCase):
+    def test_static_urls_are_versioned(self):
+        from django.conf import settings
+        page = self.client.get(reverse("dashboard"))
+        self.assertContains(page, f"app.css?v={settings.ASSET_VERSION}")
+        self.assertContains(page, f"app.js?v={settings.ASSET_VERSION}")
+        self.client.logout()
+        self.assertContains(self.client.get(reverse("login")), f"app.css?v={settings.ASSET_VERSION}")

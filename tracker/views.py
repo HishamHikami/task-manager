@@ -937,7 +937,7 @@ def manifest(request):
 
 
 SERVICE_WORKER = """
-const CACHE = "tm-v1";
+const CACHE = "tm-v2";
 const OFFLINE = "/offline/";
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll([OFFLINE])).then(() => self.skipWaiting()));

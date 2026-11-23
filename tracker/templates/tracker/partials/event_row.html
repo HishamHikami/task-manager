@@ -3,6 +3,7 @@
   <div class="row-main">
     <span class="row-title">{{ event.title }}</span>
     <span class="row-meta">
+      <span class="pill-inline"><span class="pill status-{{ event.status }}">{{ event.status_short }}</span></span>
       {% if not hide_ws %}<span class="dot c-{{ event.workspace.color }}" title="{{ event.workspace.name }}"></span>{% endif %}
       <span>{{ event.start|date:"D, H:i" }}</span>
       <span class="sep">{{ event.get_my_role_display }}</span>

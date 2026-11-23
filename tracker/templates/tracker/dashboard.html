@@ -17,10 +17,10 @@
 {% else %}
 
 <div class="stats">
-  <a class="stat" href="#attention"><span class="stat-n{% if attention %} warn{% endif %}">{{ attention|length }}</span><span class="stat-l">Need attention</span></a>
-  <a class="stat" href="{% url 'task_list' %}"><span class="stat-n">{{ open_count }}</span><span class="stat-l">Open tasks</span></a>
-  <a class="stat" href="{% url 'event_list' %}"><span class="stat-n">{{ upcoming_events|length }}</span><span class="stat-l">Events, 2 weeks</span></a>
-  {% if open_invites %}<a class="stat" href="{% url 'event_list' %}?show=invites"><span class="stat-n warn">{{ open_invites }}</span><span class="stat-l">Invites to answer</span></a>{% endif %}
+  <a class="stat" href="#attention"><span class="stat-n{% if attention %} warn{% endif %}">{{ attention|length }}</span><span class="stat-l">Attention</span></a>
+  <a class="stat" href="{% url 'task_list' %}"><span class="stat-n">{{ open_count }}</span><span class="stat-l">Open</span></a>
+  <a class="stat" href="{% url 'event_list' %}"><span class="stat-n">{{ upcoming_events|length }}</span><span class="stat-l">Events</span></a>
+  {% if open_invites %}<a class="stat" href="{% url 'event_list' %}?show=invites"><span class="stat-n warn">{{ open_invites }}</span><span class="stat-l">Invites</span></a>{% endif %}
 </div>
 
 {% if attention %}
