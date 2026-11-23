@@ -436,6 +436,12 @@ def holder_create(request, ws_pk):
     back_to = _safe_next(request)
     form = HolderForm(request.POST or None, workspace=workspace)
     if request.method == "POST" and form.is_valid():
+        if form.cleaned_data.get("department"):
+            contact = form.save_into_department()
+            dept = contact.holder
+            messages.success(request, f"Added {contact.name} to {dept.name}.")
+            url = dept.get_absolute_url()
+            return redirect(_with_params(url, next=back_to) if back_to else url)
         holder = form.save(commit=False)
         holder.workspace = workspace
         holder.save()

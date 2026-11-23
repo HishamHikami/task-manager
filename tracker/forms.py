@@ -42,6 +42,11 @@ class StageForm(forms.ModelForm):
         return name
 
 
+class HolderChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        return obj.display_name
+
+
 class HolderForm(forms.ModelForm):
     class Meta:
         model = Holder
@@ -52,19 +57,60 @@ class HolderForm(forms.ModelForm):
             "email": forms.EmailInput(attrs={"autocomplete": "email"}),
         }
 
+    # Only when adding a new Person: optionally put them inside a department.
+    department = HolderChoiceField(
+        queryset=Holder.objects.none(),
+        required=False,
+        label="Department (optional)",
+        help_text="Pick one to add this person to that department's people list. "
+                  "Leave empty for someone who works on their own.",
+    )
+    role = forms.CharField(max_length=120, required=False, help_text="e.g. Manager, Secretary, Accountant.")
+    is_primary = forms.BooleanField(
+        label="Main contact", required=False, help_text="The person you usually deal with in that department."
+    )
+    field_order = ["name", "kind", "department", "role", "is_primary", "phone", "email", "notes", "active"]
+
     def __init__(self, *args, workspace=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.workspace = workspace or self.instance.workspace
+        if self.instance.pk:
+            for name in ["department", "role", "is_primary"]:
+                self.fields.pop(name)
+        else:
+            self.fields["department"].queryset = (
+                self.workspace.holders.filter(active=True, kind__in=Holder.GROUP_KINDS)
+                .prefetch_related("contacts")
+            )
+            self.fields["department"].label_from_instance = lambda h: h.name
 
     def clean_phone(self):
         return " ".join(self.cleaned_data["phone"].split())
 
     def clean_name(self):
-        name = self.cleaned_data["name"].strip()
-        qs = Holder.objects.filter(workspace=self.workspace, name__iexact=name).exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise forms.ValidationError("This workspace already has someone with that name.")
-        return name
+        return self.cleaned_data["name"].strip()
+
+    def clean(self):
+        data = super().clean()
+        if data.get("kind") != "person":
+            data["department"] = None
+        if data.get("department"):
+            return data  # becomes a person in that department, not a separate desk
+        name = data.get("name")
+        if name and Holder.objects.filter(workspace=self.workspace, name__iexact=name).exclude(
+            pk=self.instance.pk
+        ).exists():
+            self.add_error("name", "This workspace already has someone with that name.")
+        return data
+
+    def save_into_department(self):
+        """Save as a person inside the chosen department. Returns the Contact."""
+        d = self.cleaned_data
+        return Contact.objects.create(
+            holder=d["department"], name=d["name"], role=d.get("role", "").strip(),
+            is_primary=d.get("is_primary", False), phone=d.get("phone", ""), email=d.get("email", ""),
+            notes=d.get("notes", ""), active=d.get("active", True),
+        )
 
 
 class ContactForm(forms.ModelForm):
@@ -79,11 +125,6 @@ class ContactForm(forms.ModelForm):
 
     def clean_phone(self):
         return " ".join(self.cleaned_data["phone"].split())
-
-
-class HolderChoiceField(forms.ModelChoiceField):
-    def label_from_instance(self, obj):
-        return obj.display_name
 
 
 class TaskForm(forms.ModelForm):

@@ -352,3 +352,53 @@ class DoingItMyselfTests(BaseCase):
         self.client.post(reverse("task_handoff", args=[task.pk]), {"to_holder": self.gm.pk})
         page = self.client.get(task.get_absolute_url())
         self.assertContains(page, 'Me <span class="arrow">→</span> <strong>GM Office</strong>')
+
+
+class PersonIntoDepartmentTests(BaseCase):
+    url = None
+
+    def setUp(self):
+        super().setUp()
+        self.url = reverse("holder_create", args=[self.ws.pk])
+
+    def test_person_with_department_is_added_to_its_people(self):
+        resp = self.client.post(self.url, {"name": "Sara", "kind": "person", "department": self.finance.pk,
+                                           "role": "Finance Manager", "is_primary": "on",
+                                           "email": "sara@example.com", "active": "on"})
+        self.assertRedirects(resp, self.finance.get_absolute_url(), fetch_redirect_response=False)
+        self.assertFalse(Holder.objects.filter(name="Sara").exists())  # not a separate desk
+        sara = self.finance.contacts.get(name="Sara")
+        self.assertEqual((sara.role, sara.is_primary, sara.email), ("Finance Manager", True, "sara@example.com"))
+
+    def test_person_without_department_stays_on_their_own(self):
+        self.client.post(self.url, {"name": "Omar", "kind": "person", "active": "on"})
+        self.assertTrue(Holder.objects.filter(name="Omar", kind="person").exists())
+
+    def test_department_ignored_for_non_person_types(self):
+        self.client.post(self.url, {"name": "Legal", "kind": "department", "department": self.finance.pk,
+                                    "active": "on"})
+        self.assertTrue(Holder.objects.filter(name="Legal", kind="department").exists())
+        self.assertFalse(self.finance.contacts.exists())
+
+    def test_only_departments_offered(self):
+        Holder.objects.create(workspace=self.ws, name="Lone Person", kind="person")
+        page = self.client.get(self.url).content.decode()
+        dept_select = page.split('name="department"')[1].split("</select>")[0]
+        self.assertIn("Finance", dept_select)
+        self.assertNotIn("Lone Person", dept_select)
+
+    def test_same_name_allowed_inside_department(self):
+        Holder.objects.create(workspace=self.ws, name="Ali", kind="person")
+        self.client.post(self.url, {"name": "Ali", "kind": "person", "department": self.gm.pk, "active": "on"})
+        self.assertTrue(self.gm.contacts.filter(name="Ali").exists())
+
+    def test_from_task_returns_via_department_page(self):
+        back = reverse("task_create", args=[self.ws.pk])
+        resp = self.client.post(self.url + "?next=" + back,
+                                {"name": "Sara", "kind": "person", "department": self.finance.pk, "active": "on"})
+        self.assertRedirects(resp, f"{self.finance.get_absolute_url()}?next={back.replace('/', '%2F')}",
+                             fetch_redirect_response=False)
+
+    def test_edit_form_has_no_department_field(self):
+        page = self.client.get(reverse("holder_edit", args=[self.finance.pk]))
+        self.assertNotContains(page, 'name="department"')

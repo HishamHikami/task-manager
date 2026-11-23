@@ -41,6 +41,31 @@
   document.addEventListener("htmx:afterSettle", restore);
 })();
 
+// Adding a Person: the Department choice appears only for type Person, and
+// Role / Main contact only once a department is picked.
+(function () {
+  function sync() {
+    document.querySelectorAll('select[name="kind"]').forEach(function (kind) {
+      var form = kind.form;
+      var dept = form && form.querySelector('[data-field="department"]');
+      if (!dept) return;
+      var isPerson = kind.value === "person";
+      dept.hidden = !isPerson;
+      var deptSelect = dept.querySelector("select");
+      var inDept = isPerson && deptSelect && deptSelect.value !== "";
+      ["role", "is_primary"].forEach(function (name) {
+        var f = form.querySelector('[data-field="' + name + '"]');
+        if (f) f.hidden = !inDept;
+      });
+    });
+  }
+  document.addEventListener("change", function (e) {
+    if (e.target.matches && e.target.matches('select[name="kind"], select[name="department"]')) sync();
+  });
+  document.addEventListener("DOMContentLoaded", sync);
+  document.addEventListener("htmx:afterSettle", sync);
+})();
+
 // "I'm doing it" means the task is on my own desk: hide "Currently with".
 (function () {
   function sync() {
