@@ -98,6 +98,37 @@ ThemeData _theme(Brightness b) {
       ),
       clipBehavior: Clip.antiAlias,
     ),
+    datePickerTheme: DatePickerThemeData(
+      backgroundColor: dark ? const Color(0xFF161D26) : Colors.white,
+      surfaceTintColor: Colors.transparent,
+      dayShape: WidgetStatePropertyAll(
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      yearShape: WidgetStatePropertyAll(
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      todayBorder: BorderSide(color: scheme.primary, width: 1.5),
+      dayStyle: const TextStyle(fontWeight: FontWeight.w600),
+      weekdayStyle: TextStyle(
+        fontWeight: FontWeight.w700,
+        color: scheme.onSurfaceVariant,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+    ),
+    chipTheme: ChipThemeData(
+      backgroundColor: Colors.transparent,
+      selectedColor: scheme.primaryContainer,
+      side: WidgetStateBorderSide.resolveWith(
+        (s) => s.contains(WidgetState.selected)
+            ? BorderSide(color: scheme.primaryContainer)
+            : BorderSide(color: scheme.outlineVariant),
+      ),
+      shape: const StadiumBorder(),
+      labelStyle: base.textTheme.labelLarge?.copyWith(
+        fontWeight: FontWeight.w600,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+    ),
     dialogTheme: DialogThemeData(
       backgroundColor: dark ? const Color(0xFF161D26) : Colors.white,
       surfaceTintColor: Colors.transparent,

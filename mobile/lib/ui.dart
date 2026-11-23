@@ -779,22 +779,14 @@ class DateField extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: () async {
-        final now = DateTime.now();
-        final d = await showDatePicker(
-          context: context,
-          initialDate: value ?? now,
-          firstDate: DateTime(now.year - 5),
-          lastDate: DateTime(now.year + 5),
+        FocusScope.of(context).unfocus();
+        final r = await showDateSheet(
+          context,
+          title: label.replaceAll(' (optional)', ''),
+          initial: value,
+          withTime: withTime,
         );
-        if (d == null || !context.mounted) return;
-        if (!withTime) return onChanged(d);
-        final t = await showTimePicker(
-          context: context,
-          initialTime: TimeOfDay.fromDateTime(value ?? now),
-        );
-        onChanged(
-          DateTime(d.year, d.month, d.day, t?.hour ?? 9, t?.minute ?? 0),
-        );
+        if (r != null) onChanged(r.value);
       },
       child: InputDecorator(
         decoration: InputDecoration(
