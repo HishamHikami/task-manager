@@ -20,7 +20,7 @@ ExecStart=/srv/taskmanager/.venv/bin/gunicorn config.wsgi:application \
 RuntimeDirectory=taskmanager
 RuntimeDirectoryMode=0750
 StateDirectory=taskmanager
-StateDirectoryMode=0750
+StateDirectoryMode=0700
 Restart=on-failure
 RestartSec=5
 

@@ -7,7 +7,7 @@ certbot. Replace `tasks.example.com` with your subdomain. Run everything as root
 |---|---|
 | Code (root-owned) | `/srv/taskmanager` |
 | Settings / secrets | `/etc/taskmanager/env` (root:root, 600) |
-| Database + backups | `/var/lib/taskmanager` (app user, 750) |
+| Database + backups | `/var/lib/taskmanager` (app user only, 700) |
 | Socket | `/run/taskmanager/gunicorn.sock` |
 
 ## 1. DNS
