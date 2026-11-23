@@ -260,3 +260,4 @@ table.list form { margin: 0; }
 td .contactlinks { margin-top: 2px; font-size: .85rem; }
 .add-holder { align-self: flex-start; margin-top: 2px; }
 .backbar { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.role-line { display: block; color: var(--muted); font-size: .9rem; margin-top: 2px; }

@@ -12,7 +12,12 @@
   <h1>{{ task.title }}</h1>
   {% if task.description %}<p class="desc">{{ task.description|linebreaksbr }}</p>{% endif %}
   <dl class="facts">
-    <div><dt>Currently with</dt><dd>{% if task.current_holder %}<strong>{{ task.current_holder.display_name }}</strong><span class="muted"> for {{ task.days_with_holder }} day{{ task.days_with_holder|pluralize }}</span>{% with h=task.current_holder %}{% include "tracker/partials/contact_links.html" with p=h %}
+    <div><dt>Currently with</dt><dd>{% if task.current_holder %}<strong>{{ task.current_holder.display_name }}</strong><span class="muted"> for {{ task.days_with_holder }} day{{ task.days_with_holder|pluralize }}</span>{% with h=task.current_holder %}{% with m=h.primary_contact %}{% if m %}
+      {# A department with a main contact: show that person's own details, not the department's. #}
+      {% if m.role %}<span class="role-line">{{ m.name }} · {{ m.role }}</span>{% endif %}
+      {% if m.phone or m.email %}{% include "tracker/partials/contact_links.html" with p=m %}
+      {% elif h.phone or h.email %}<small class="muted role-line">No phone/email saved for {{ m.name }}. Department contact:</small>{% include "tracker/partials/contact_links.html" with p=h %}{% endif %}
+      {% else %}{% include "tracker/partials/contact_links.html" with p=h %}{% endif %}{% endwith %}
       {% if h.is_group %}{% with people=h.contacts.all %}{% if people %}
       <details class="people-mini"><summary>People at {{ h.name }} ({{ people|length }})</summary>
         <ul>{% for c in people %}{% if c.active %}<li><strong>{{ c.name }}</strong>{% if c.role %} · {{ c.role }}{% endif %}{% if c.is_primary %} ★{% endif %}

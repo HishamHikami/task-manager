@@ -284,9 +284,36 @@ class CopyButtonTests(BaseCase):
         self.finance.email = "finance@example.com"
         self.finance.save()
         Contact.objects.create(holder=self.finance, name="Sara", role="Manager", email="sara@example.com")
-        for url in [self.make_task().get_absolute_url(), self.finance.get_absolute_url(),
-                    self.ws.get_absolute_url()]:
+        for url in [self.finance.get_absolute_url(), self.ws.get_absolute_url()]:
             page = self.client.get(url)
             self.assertContains(page, 'data-copy="+966 11 222 3333"')
             self.assertContains(page, 'data-copy="finance@example.com"')
+        # The task page shows the person it's with (Sara), each with a copy button.
+        self.assertContains(self.client.get(self.make_task().get_absolute_url()), 'data-copy="sara@example.com"')
         self.assertContains(self.client.get(self.finance.get_absolute_url()), 'data-copy="sara@example.com"')
+
+
+class CurrentlyWithContactTests(BaseCase):
+    def setUp(self):
+        super().setUp()
+        self.finance.email = "finance-dept@example.com"
+        self.finance.save()
+
+    def test_shows_main_contacts_own_email_not_departments(self):
+        Contact.objects.create(holder=self.finance, name="Sara", role="Finance Manager", is_primary=True,
+                               email="sara@example.com")
+        page = self.client.get(self.make_task().get_absolute_url())
+        facts = page.content.decode().split('<dl class="facts">')[1].split("People at")[0]
+        self.assertIn("sara@example.com", facts)
+        self.assertIn("Sara · Finance Manager", facts)
+        self.assertNotIn("finance-dept@example.com", facts)
+
+    def test_falls_back_to_department_when_person_has_no_details(self):
+        Contact.objects.create(holder=self.finance, name="Sara", is_primary=True)
+        page = self.client.get(self.make_task().get_absolute_url())
+        self.assertContains(page, "No phone/email saved for Sara")
+        self.assertContains(page, 'data-copy="finance-dept@example.com"')
+
+    def test_department_without_people_shows_department_details(self):
+        page = self.client.get(self.make_task().get_absolute_url())
+        self.assertContains(page, 'data-copy="finance-dept@example.com"')
