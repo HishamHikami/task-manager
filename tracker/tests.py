@@ -1,3 +1,4 @@
+import re
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
@@ -787,3 +788,59 @@ class AssetVersionTests(BaseCase):
         self.assertContains(page, f"app.js?v={settings.ASSET_VERSION}")
         self.client.logout()
         self.assertContains(self.client.get(reverse("login")), f"app.css?v={settings.ASSET_VERSION}")
+
+
+class ChatCaptureTests(AIBase):
+    HX = {"HTTP_HX_REQUEST": "true"}
+
+    def test_page_is_chat(self):
+        page = self.client.get(reverse("capture"))
+        self.assertContains(page, 'class="composer"')
+        self.assertContains(page, 'name="use_ai"')
+        self.assertContains(page, "Paste or share a message")
+
+    def test_shared_text_goes_into_composer(self):
+        page = self.client.get(reverse("capture"), {"text": "Meeting moved to Monday"})
+        self.assertContains(page, ">Meeting moved to Monday</textarea>")
+
+    def test_send_returns_two_bubbles_only(self):
+        FakeAnthropic.result = suggestion(new_task_title="Approve budget")
+        resp = self.client.post(reverse("capture"), {"text": "Budget needs approval", "workspace": self.ws.pk,
+                                                      "use_ai": "1"}, **self.HX)
+        html = resp.content.decode()
+        self.assertNotIn("<html", html)
+        self.assertIn('class="msg me"', html)
+        self.assertIn('class="msg ai"', html)
+        self.assertIn("Finance approved the budget", html)
+
+    def test_two_replies_have_distinct_ids(self):
+        FakeAnthropic.result = suggestion()
+        a = self.client.post(reverse("capture"), {"text": "One", "workspace": self.ws.pk}, **self.HX).content.decode()
+        b = self.client.post(reverse("capture"), {"text": "Two", "workspace": self.ws.pk}, **self.HX).content.decode()
+        ida = re.search(r'id="(r[0-9a-f]+)_summary"', a).group(1)
+        idb = re.search(r'id="(r[0-9a-f]+)_summary"', b).group(1)
+        self.assertNotEqual(ida, idb)
+
+    def test_save_in_chat_returns_saved_bubble(self):
+        task = self.make_task()
+        resp = self.client.post(reverse("capture_save"), {
+            "workspace": self.ws.pk, "uid": "abc123", "body": "Approved", "kind": "whatsapp",
+            "action": "update_task", "task": task.pk, "follow_up_date": "2026-12-01"}, **self.HX)
+        html = resp.content.decode()
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("Added to the timeline of", html)
+        self.assertIn(task.get_absolute_url(), html)
+        self.assertIn("follow up Tue 01 Dec", html)
+
+    def test_invalid_save_in_chat_rerenders_bubble(self):
+        resp = self.client.post(reverse("capture_save"), {
+            "workspace": self.ws.pk, "uid": "abc123", "body": "x", "kind": "note", "action": "update_task"}, **self.HX)
+        self.assertEqual(resp.status_code, 200)  # htmx only swaps 2xx
+        self.assertContains(resp, "Choose the task this belongs to.")
+        self.assertContains(resp, 'id="rabc123_task"')
+
+    def test_ai_error_shown_in_bubble(self):
+        AppSettings.objects.update(anthropic_key_encrypted="")
+        resp = self.client.post(reverse("capture"), {"text": "Hi", "workspace": self.ws.pk, "use_ai": "1"}, **self.HX)
+        self.assertContains(resp, "No AI key yet")
+        self.assertContains(resp, "You can still file it yourself")

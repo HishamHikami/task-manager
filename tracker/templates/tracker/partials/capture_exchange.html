@@ -1,0 +1,10 @@
+<div class="msg me">
+  <div class="bubble">
+    {% if text|length > 420 %}
+      <div class="clip">{{ text|truncatechars:420 }}</div>
+      <details class="more"><summary>Show all</summary><div class="prewrap">{{ text }}</div></details>
+    {% else %}<div class="prewrap">{{ text }}</div>{% endif %}
+    <span class="meta">{{ workspace.name }}</span>
+  </div>
+</div>
+{% include "tracker/partials/capture_reply.html" %}

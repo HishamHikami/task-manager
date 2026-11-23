@@ -1,0 +1,8 @@
+<div class="msg ai">
+  <div class="avatar ok" aria-hidden="true">✓</div>
+  <div class="bubble">
+    <p><strong>{{ headline }}</strong> <a href="{{ url }}">{{ title }}</a></p>
+    {% if notes %}<p class="muted small">{{ notes|join:" · " }}</p>{% endif %}
+    <a class="btn btn-small" href="{{ url }}">{{ link_label }}</a>
+  </div>
+</div>

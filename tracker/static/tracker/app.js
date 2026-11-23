@@ -195,3 +195,104 @@ document.addEventListener("submit", function (e) {
   });
   document.addEventListener("htmx:afterSettle", function () { show(!!deferred); });
 })();
+
+// Chat-style Quick capture.
+(function () {
+  function thread() { return document.getElementById("thread"); }
+  function scrollToEnd() {
+    var t = thread();
+    if (!t) return;
+    var last = t.lastElementChild;
+    if (last) last.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function grow(ta) {
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, window.innerHeight * 0.4) + "px";
+  }
+  function syncAI() {
+    var form = document.querySelector("form.composer");
+    if (!form) return;
+    var sel = form.querySelector('select[name="workspace"]');
+    var box = form.querySelector('input[name="use_ai"]');
+    var hint = document.getElementById("ai-hint");
+    if (!sel || !box || box.dataset.noKey === "1") return;
+    var opt = sel.options[sel.selectedIndex];
+    var allowed = opt && opt.dataset.ai === "1";
+    if (!allowed) { box.dataset.was = box.checked ? "1" : "0"; box.checked = false; }
+    else if (box.disabled && box.dataset.was === "1") { box.checked = true; }
+    box.disabled = !allowed;
+    if (hint) hint.textContent = allowed ? "" : "AI is off for " + opt.text + " — it will be saved without AI.";
+  }
+  function init() {
+    var ta = document.getElementById("composer-text");
+    if (!ta) return;
+    var box = document.querySelector('form.composer input[name="use_ai"]');
+    if (box && box.disabled) box.dataset.noKey = "1";
+    grow(ta);
+    syncAI();
+    if (ta.value) ta.focus();
+  }
+
+  document.addEventListener("input", function (e) { if (e.target.id === "composer-text") grow(e.target); });
+  document.addEventListener("change", function (e) {
+    if (e.target.closest && e.target.closest("form.composer") && e.target.name === "workspace") syncAI();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.target.id === "composer-text" && e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      e.target.form.requestSubmit();
+    }
+  });
+
+  // Show my message right away, then replace it with the server's copy when the reply arrives.
+  document.addEventListener("htmx:beforeRequest", function (e) {
+    var form = e.detail.elt;
+    if (!form.matches || !form.matches("form.composer")) return;
+    var ta = form.querySelector("textarea");
+    if (!ta.value.trim()) { e.preventDefault(); return; }
+    var msg = document.createElement("div");
+    msg.className = "msg me pending";
+    var bubble = document.createElement("div");
+    bubble.className = "bubble";
+    var body = document.createElement("div");
+    body.className = "prewrap";
+    body.textContent = ta.value.length > 420 ? ta.value.slice(0, 420) + "…" : ta.value;
+    bubble.appendChild(body);
+    msg.appendChild(bubble);
+    thread().appendChild(msg);
+    scrollToEnd();
+  });
+  document.addEventListener("htmx:beforeSwap", function (e) {
+    if (e.detail.target && e.detail.target.id === "thread") {
+      document.querySelectorAll("#thread .msg.pending").forEach(function (m) { m.remove(); });
+    }
+  });
+  document.addEventListener("htmx:afterRequest", function (e) {
+    var form = e.detail.elt;
+    if (!form.matches || !form.matches("form.composer")) return;
+    if (e.detail.successful) {
+      var ta = form.querySelector("textarea");
+      ta.value = "";
+      grow(ta);
+    } else {
+      document.querySelectorAll("#thread .msg.pending").forEach(function (m) { m.remove(); });
+      alert("Couldn't send — check your connection and try again.");
+    }
+  });
+  document.addEventListener("htmx:afterSettle", function (e) {
+    if (e.detail.target && e.detail.target.id === "thread") scrollToEnd();
+  });
+
+  // Discard a suggestion (and the message it answered).
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest && e.target.closest("[data-dismiss-msg]");
+    if (!btn) return;
+    var reply = btn.closest(".msg");
+    var mine = reply.previousElementSibling;
+    if (mine && mine.classList.contains("me")) mine.remove();
+    reply.remove();
+  });
+
+  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("htmx:afterSwap", function (e) { if (e.detail.target === document.body) init(); });
+})();

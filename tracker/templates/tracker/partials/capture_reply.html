@@ -1,0 +1,57 @@
+<div class="msg ai">
+  <div class="avatar" aria-hidden="true">✦</div>
+  <div class="bubble bubble-wide">
+    {% if error %}<p class="text-red">{{ error }}</p><p class="muted">You can still file it yourself below.</p>
+    {% elif info.used_ai %}<p class="ai-says">{{ form.summary.value }}</p>
+    <p class="muted small">✨ Suggested by AI{% if info.cached %} · same text as before, reused at no cost{% endif %}{% if info.shortened %} · only the first part of this long message was read{% endif %}. Check it and press Save.</p>
+    {% else %}<p><strong>Check and save</strong> — choose where this goes.</p>{% endif %}
+
+    <form method="post" action="{% url 'capture_save' %}" class="reviewform"
+          hx-post="{% url 'capture_save' %}" hx-target="closest .msg" hx-swap="outerHTML">
+      {% csrf_token %}
+      <input type="hidden" name="uid" value="{{ uid }}">
+      {{ form.workspace }}{{ form.body }}
+      {% if form.non_field_errors %}<p class="error">{% for e in form.non_field_errors %}{{ e }} {% endfor %}</p>{% endif %}
+
+      <div class="choice-row" role="radiogroup" aria-label="What to do with it">
+        {% for radio in form.action %}<label class="radiocard">{{ radio.tag }} {{ radio.choice_label }}</label>{% endfor %}
+      </div>
+
+      <div class="when when-update_task">
+        {% with f=form.task %}<div class="field {% if f.errors %}has-error{% endif %}"><label for="{{ f.id_for_label }}">Task</label>{{ f }}{% for e in f.errors %}<small class="error">{{ e }}</small>{% endfor %}</div>{% endwith %}
+      </div>
+      <div class="when when-new_task">
+        {% with f=form.new_task_title %}<div class="field {% if f.errors %}has-error{% endif %}"><label for="{{ f.id_for_label }}">Title</label>{{ f }}{% for e in f.errors %}<small class="error">{{ e }}</small>{% endfor %}</div>{% endwith %}
+        {% with f=form.my_role %}<div class="field"><label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}</div>{% endwith %}
+      </div>
+      <div class="when when-update_task when-new_task">
+        {% with f=form.desk %}<div class="field" data-field="current_holder"><label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}</div>{% endwith %}
+        <div class="when when-update_task">{% with f=form.handoff %}<div class="field field-check"><label>{{ f }} {{ f.label }}</label></div>{% endwith %}</div>
+        <div class="row2">
+          {% with f=form.follow_up_date %}<div class="field"><label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}</div>{% endwith %}
+          {% with f=form.due_date %}<div class="field"><label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}</div>{% endwith %}
+        </div>
+        {% with f=form.next_action %}<div class="field"><label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}</div>{% endwith %}
+      </div>
+      <div class="when when-new_event">
+        {% for f in form %}{% if f.name|slice:":6" == "event_" %}
+        <div class="field {% if f.errors %}has-error{% endif %}"><label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}{% for e in f.errors %}<small class="error">{{ e }}</small>{% endfor %}</div>
+        {% endif %}{% endfor %}
+      </div>
+
+      <details class="more">
+        <summary>Summary, type and sender</summary>
+        {% with f=form.summary %}<div class="field"><label for="{{ f.id_for_label }}">Summary</label>{{ f }}</div>{% endwith %}
+        <div class="row2">
+          {% with f=form.kind %}<div class="field"><label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}</div>{% endwith %}
+          {% with f=form.source %}<div class="field"><label for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}</div>{% endwith %}
+        </div>
+      </details>
+
+      <div class="actions">
+        <button class="btn btn-primary" type="submit">Save</button>
+        <button class="btn btn-ghost" type="button" data-dismiss-msg>Discard</button>
+      </div>
+    </form>
+  </div>
+</div>

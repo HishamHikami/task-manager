@@ -1,20 +1,44 @@
 {% extends "tracker/base.html" %}
-{% block title %}Quick capture{% endblock %}
+{% block title %}Capture{% endblock %}
 {% block content %}
-<div class="card narrow">
-  <h1>⚡ Quick capture</h1>
-  <p class="muted">Paste an email, WhatsApp message or meeting minutes{% if ai_ready %} and the AI suggests a short summary, the task it belongs to, who has it and any dates. You check everything before it's saved{% endif %}.</p>
-  {% if not ai_ready %}
-  <div class="flash flash-info">AI isn't set up yet — you can still save messages by hand. To get summaries, add your Anthropic API key in <a href="{% url 'settings' %}">Settings</a>.</div>
-  {% endif %}
-  <form method="post" class="captureform">
-    {% csrf_token %}
-    {% include "tracker/partials/form_fields.html" %}
-    <div class="actions">
-      {% if ai_ready %}<button class="btn btn-primary" type="submit" name="use_ai" value="1" data-busy="Reading…">✨ Summarize with AI</button>{% endif %}
-      <button class="btn{% if not ai_ready %} btn-primary{% endif %}" type="submit" name="manual" value="1">Save without AI</button>
+<div class="chat">
+  <div class="chat-thread" id="thread" aria-live="polite">
+    <div class="msg ai">
+      <div class="avatar" aria-hidden="true">✦</div>
+      <div class="bubble">
+        <p><strong>Paste or share a message</strong> — an email, a WhatsApp message or meeting minutes.</p>
+        <p class="muted">{% if ai_ready %}I'll summarize it and suggest where it belongs: which task, who has it now, and any dates or events. Nothing is saved until you press Save.{% else %}AI isn't set up yet, so I'll give you a form to file it yourself. Add your API key in <a href="{% url 'settings' %}">Settings</a> to get suggestions.{% endif %}</p>
+      </div>
     </div>
-    {% if ai_off_workspaces %}<small class="help">AI is off for: {% for w in ai_off_workspaces %}{{ w.name }}{% if not forloop.last %}, {% endif %}{% endfor %} — their text is never sent.</small>{% endif %}
+    {% if exchange %}{% include "tracker/partials/capture_exchange.html" with form=exchange.form workspace=exchange.workspace info=exchange.info error=exchange.error text=exchange.text uid=exchange.uid %}{% endif %}
+  </div>
+
+  <div class="msg ai typing htmx-indicator" id="typing" aria-hidden="true">
+    <div class="avatar">✦</div>
+    <div class="bubble"><span class="dots"><i></i><i></i><i></i></span></div>
+  </div>
+
+  <form method="post" action="{% url 'capture' %}" class="composer"
+        hx-post="{% url 'capture' %}" hx-target="#thread" hx-swap="beforeend" hx-indicator="#typing">
+    {% csrf_token %}
+    <div class="composer-box">
+      <textarea name="text" id="composer-text" rows="1" placeholder="Paste a message…" required
+                aria-label="Message">{{ form.text.value|default_if_none:"" }}</textarea>
+      <div class="composer-bar">
+        <select name="workspace" class="chip-select" aria-label="Workspace">
+          {% for w in workspaces %}<option value="{{ w.pk }}" {% if form.workspace.value|stringformat:"s" == w.pk|stringformat:"s" %}selected{% endif %} data-ai="{{ w.ai_enabled|yesno:'1,0' }}">{{ w.name }}</option>{% endfor %}
+        </select>
+        <label class="switch {% if not ai_ready %}is-disabled{% endif %}" title="{% if ai_ready %}Use AI to suggest where it goes{% else %}Add an API key in Settings to use AI{% endif %}">
+          <input type="checkbox" name="use_ai" value="1" {% if ai_ready %}checked{% else %}disabled{% endif %}>
+          <span class="track"><span class="knob"></span></span>
+          <span class="switch-label">AI</span>
+        </label>
+        <button class="send" type="submit" aria-label="Send" title="Send (Ctrl+Enter)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        </button>
+      </div>
+    </div>
+    <p class="composer-hint muted" id="ai-hint"></p>
   </form>
 </div>
 {% endblock %}

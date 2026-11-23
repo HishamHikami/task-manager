@@ -362,8 +362,7 @@ class CaptureForm(forms.Form):
 
 
 class CaptureReviewForm(forms.Form):
-    ACTIONS = [("update_task", "Add to an existing task"), ("new_task", "Register a new task"),
-               ("new_event", "Add as an event")]
+    ACTIONS = [("update_task", "Existing task"), ("new_task", "New task"), ("new_event", "Event")]
 
     workspace = forms.ModelChoiceField(queryset=Workspace.objects.all(), widget=forms.HiddenInput)
     body = forms.CharField(widget=forms.HiddenInput, required=False)

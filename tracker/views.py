@@ -1,4 +1,5 @@
 import re
+import secrets
 from collections import OrderedDict
 from datetime import timedelta
 from datetime import timezone as dt_timezone
@@ -770,57 +771,75 @@ def _guess_kind(text):
     return "note"
 
 
+def _capture_reply(request, ws, text, use_ai):
+    """Build the assistant's reply for one captured message: a review form, pre-filled by AI if asked."""
+    initial = {"workspace": ws, "body": text, "kind": _guess_kind(text), "action": "new_task",
+               "my_role": "following"}
+    info, error = {}, ""
+    if use_ai:
+        try:
+            suggestion, info = ai.suggest_for_capture(ws, text)
+        except ai.AIError as exc:
+            error, suggestion = str(exc), None
+        if suggestion:
+            initial.update({
+                "summary": suggestion["summary"], "kind": suggestion["message_kind"],
+                "source": suggestion["sender"], "action": suggestion["action"],
+                "task": suggestion["task_id"], "new_task_title": suggestion["new_task_title"],
+                "desk": suggestion["desk"], "next_action": suggestion["next_action"],
+                "due_date": suggestion["due_date"], "follow_up_date": suggestion["follow_up_date"],
+                "event_title": suggestion["event_title"], "event_start": suggestion["event_start"],
+                "event_end": suggestion["event_end"], "event_location": suggestion["event_location"],
+                "event_my_role": suggestion["event_my_role"] or "guest",
+                "event_kind": suggestion["event_kind"] or "meeting",
+                "handoff": bool(suggestion["desk"]),
+            })
+            info["used_ai"] = True
+    uid = secrets.token_hex(3)
+    form = CaptureReviewForm(initial=initial, workspace=ws, auto_id=f"r{uid}_%s")
+    return {"form": form, "workspace": ws, "info": info, "error": error, "text": text, "uid": uid}
+
+
+def _capture_page(request, form, exchange=None, status=200):
+    return render(request, "tracker/capture.html", {
+        "form": form, "exchange": exchange, "ai_ready": ai.is_configured(),
+        "workspaces": Workspace.objects.filter(archived=False),
+    }, status=status)
+
+
 def capture(request):
+    """Chat-style capture: paste or share a message, get a suggested filing, check it, save."""
     workspace = _selected_workspace(request) or Workspace.objects.filter(archived=False).first()
     if not workspace:
         messages.info(request, "Create a workspace first.")
         return redirect("workspace_create")
     form = CaptureForm(request.POST or None, initial={"text": _shared_text(request), "workspace": workspace})
-    ai_ready = ai.is_configured()
     if request.method == "POST" and form.is_valid():
         ws = form.cleaned_data["workspace"]
-        text = form.cleaned_data["text"]
-        initial = {"workspace": ws, "body": text, "kind": _guess_kind(text), "action": "new_task",
-                   "my_role": "following"}
-        info = {}
-        if "use_ai" in request.POST:
-            try:
-                suggestion, info = ai.suggest_for_capture(ws, text)
-            except ai.AIError as exc:
-                messages.error(request, str(exc))
-                suggestion = None
-            if suggestion:
-                initial.update({
-                    "summary": suggestion["summary"], "kind": suggestion["message_kind"],
-                    "source": suggestion["sender"], "action": suggestion["action"],
-                    "task": suggestion["task_id"], "new_task_title": suggestion["new_task_title"],
-                    "desk": suggestion["desk"], "next_action": suggestion["next_action"],
-                    "due_date": suggestion["due_date"], "follow_up_date": suggestion["follow_up_date"],
-                    "event_title": suggestion["event_title"], "event_start": suggestion["event_start"],
-                    "event_end": suggestion["event_end"], "event_location": suggestion["event_location"],
-                    "event_my_role": suggestion["event_my_role"] or "guest",
-                    "event_kind": suggestion["event_kind"] or "meeting",
-                    "handoff": bool(suggestion["desk"]),
-                })
-                info["used_ai"] = True
-        review = CaptureReviewForm(initial=initial, workspace=ws)
-        return render(request, "tracker/capture_review.html",
-                      {"form": review, "workspace": ws, "info": info, "text": text})
-    return render(request, "tracker/capture.html", {"form": form, "ai_ready": ai_ready,
-                                                     "ai_off_workspaces": Workspace.objects.filter(ai_enabled=False)})
+        exchange = _capture_reply(request, ws, form.cleaned_data["text"], "use_ai" in request.POST)
+        if request.headers.get("HX-Request"):
+            return render(request, "tracker/partials/capture_exchange.html", exchange)
+        return _capture_page(request, CaptureForm(initial={"workspace": ws}), exchange)
+    if request.method == "POST" and request.headers.get("HX-Request"):
+        return HttpResponse("")  # empty message: nothing to add
+    return _capture_page(request, form)
 
 
 @require_POST
 def capture_save(request):
     ws = get_object_or_404(Workspace, pk=request.POST.get("workspace"))
-    form = CaptureReviewForm(request.POST, workspace=ws)
+    form = CaptureReviewForm(request.POST, workspace=ws, auto_id=f"r{request.POST.get('uid', 'x')[:6]}_%s")
+    is_htmx = bool(request.headers.get("HX-Request"))
     if not form.is_valid():
-        return render(request, "tracker/capture_review.html",
-                      {"form": form, "workspace": ws, "info": {}, "text": request.POST.get("body", "")},
-                      status=400)
+        reply = {"form": form, "workspace": ws, "info": {}, "error": "", "text": request.POST.get("body", ""),
+                 "uid": request.POST.get("uid", "x")[:6]}
+        if is_htmx:
+            return render(request, "tracker/partials/capture_reply.html", reply)
+        return _capture_page(request, CaptureForm(initial={"workspace": ws}), reply, status=400)
     d = form.cleaned_data
     holder, contact = d.get("desk") or (None, None)
     action = d["action"]
+    notes = []
 
     if action == "new_event":
         event = Event.objects.create(
@@ -831,6 +850,13 @@ def capture_save(request):
             description="\n\n".join(x for x in [d.get("summary", ""), d.get("body", "")] if x),
             preparation=d.get("next_action", ""),
         )
+        if is_htmx:
+            return render(request, "tracker/partials/capture_saved.html", {
+                "headline": "Event added", "title": event.title, "url": event.get_absolute_url(),
+                "link_label": "Open event",
+                "notes": [f"{event.start:%a %d %b, %H:%M}", event.get_my_role_display(),
+                          "marked Invited — answer it when you decide"],
+            })
         messages.success(request, "Event added. Mark it Confirmed or Declined when you've answered.")
         return redirect(event)
 
@@ -844,10 +870,12 @@ def capture_save(request):
                 due_date=d.get("due_date"),
             )
             services.record_created(task)
+            notes.append("on my desk" if with_me else f"with {task.desk_name}" if holder else "not assigned yet")
         else:
             task = d["task"]
             if d.get("handoff") and holder and (holder, contact) != (task.current_holder, task.current_contact):
                 services.hand_off(task, holder, "", to_contact=contact)
+                notes.append(f"handed to {task.desk_name}")
             if d.get("due_date") and not task.due_date:
                 task.due_date = d["due_date"]
                 task.save(update_fields=["due_date", "updated_at"])
@@ -855,7 +883,15 @@ def capture_save(request):
                               source=d.get("source", ""))
         if d.get("follow_up_date"):
             services.set_follow_up(task, d["follow_up_date"], d.get("next_action", ""))
+            notes.append(f"follow up {d['follow_up_date']:%a %d %b}")
+        if d.get("due_date") and action == "new_task":
+            notes.append(f"due {d['due_date']:%a %d %b}")
         services.touch(task)
+    if is_htmx:
+        return render(request, "tracker/partials/capture_saved.html", {
+            "headline": "Added to the timeline of" if action == "update_task" else "New task registered",
+            "title": task.title, "url": task.get_absolute_url(), "link_label": "Open task", "notes": notes,
+        })
     messages.success(request, "Saved to the task's timeline." if action == "update_task" else "Task registered.")
     return redirect(task)
 
