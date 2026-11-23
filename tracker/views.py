@@ -142,12 +142,17 @@ def dashboard(request):
     for task in sorted(
         open_tasks,
         key=lambda t: (
-            t.current_holder is None,
+            0 if t.with_me else 2 if t.current_holder is None else 1,
             (t.current_holder.name.lower() if t.current_holder else ""),
             -t.priority,
         ),
     ):
-        label = task.current_holder.display_name if task.current_holder else "Not assigned to anyone"
+        if task.with_me:
+            label = "On my desk"
+        elif task.current_holder:
+            label = task.current_holder.display_name
+        else:
+            label = "Not assigned to anyone"
         if not workspace and task.current_holder:
             label = f"{label} · {task.workspace.name}"
         by_holder.setdefault(label, []).append(task)

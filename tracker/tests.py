@@ -317,3 +317,38 @@ class CurrentlyWithContactTests(BaseCase):
     def test_department_without_people_shows_department_details(self):
         page = self.client.get(self.make_task().get_absolute_url())
         self.assertContains(page, 'data-copy="finance-dept@example.com"')
+
+
+class DoingItMyselfTests(BaseCase):
+    def post_task(self, **extra):
+        data = {"title": "Write the report", "my_role": "executing",
+                "stage": self.ws.first_open_stage().pk, "priority": 2}
+        data.update(extra)
+        self.client.post(reverse("task_create", args=[self.ws.pk]), data)
+        return Task.objects.get(title="Write the report")
+
+    def test_doing_it_myself_clears_holder(self):
+        task = self.post_task(current_holder=self.finance.pk)  # even if a holder was left selected
+        self.assertIsNone(task.current_holder)
+        self.assertTrue(task.with_me)
+        page = self.client.get(task.get_absolute_url())
+        self.assertContains(page, "I'm doing it")
+        self.assertContains(page, "with <strong>me</strong>")
+
+    def test_dashboard_shows_on_my_desk_first(self):
+        self.make_task(title="With finance")
+        self.post_task()
+        page = self.client.get(reverse("dashboard")).content.decode()
+        self.assertIn("On my desk", page)
+        self.assertLess(page.index("On my desk"), page.index("Finance ·"))
+
+    def test_following_up_keeps_holder(self):
+        task = self.post_task(my_role="following", current_holder=self.finance.pk)
+        self.assertEqual(task.current_holder, self.finance)
+        self.assertFalse(task.with_me)
+
+    def test_handoff_from_me_shows_me_on_timeline(self):
+        task = self.post_task()
+        self.client.post(reverse("task_handoff", args=[task.pk]), {"to_holder": self.gm.pk})
+        page = self.client.get(task.get_absolute_url())
+        self.assertContains(page, 'Me <span class="arrow">→</span> <strong>GM Office</strong>')

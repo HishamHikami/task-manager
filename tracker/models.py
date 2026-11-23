@@ -242,6 +242,11 @@ class Task(models.Model):
         return self.stage.is_closed
 
     @property
+    def with_me(self):
+        """I'm doing it myself and haven't handed it to anyone."""
+        return self.current_holder_id is None and self.my_role == "executing"
+
+    @property
     def is_overdue(self):
         return bool(self.due_date and not self.is_closed and self.due_date < timezone.localdate())
 

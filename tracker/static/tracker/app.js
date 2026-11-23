@@ -41,6 +41,21 @@
   document.addEventListener("htmx:afterSettle", restore);
 })();
 
+// "I'm doing it" means the task is on my own desk: hide "Currently with".
+(function () {
+  function sync() {
+    document.querySelectorAll('select[name="my_role"]').forEach(function (select) {
+      var field = select.form && select.form.querySelector('[data-field="current_holder"]');
+      if (field) field.hidden = select.value === "executing";
+    });
+  }
+  document.addEventListener("change", function (e) {
+    if (e.target.matches && e.target.matches('select[name="my_role"]')) sync();
+  });
+  document.addEventListener("DOMContentLoaded", sync);
+  document.addEventListener("htmx:afterSettle", sync);
+})();
+
 // One-click copy for phone numbers and email addresses.
 (function () {
   function fallbackCopy(text) {

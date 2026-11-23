@@ -4,7 +4,7 @@
     <span class="taskrow-meta">
       <span class="tag c-{{ task.workspace.color }}">{{ task.workspace.name }}</span>
       <span class="tag stage">{{ task.stage.name }}</span>
-      {% if task.current_holder %}<span class="holder">👤 {{ task.current_holder.display_name }}{% if not task.is_closed %} · {{ task.days_with_holder }}d{% endif %}</span>{% endif %}
+      {% if task.current_holder %}<span class="holder">👤 {{ task.current_holder.display_name }}{% if not task.is_closed %} · {{ task.days_with_holder }}d{% endif %}</span>{% elif task.with_me %}<span class="holder">🙋 Me</span>{% endif %}
       {% if task.reference %}<span class="muted">#{{ task.reference }}</span>{% endif %}
     </span>
   </div>

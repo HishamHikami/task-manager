@@ -135,6 +135,12 @@ class TaskForm(forms.ModelForm):
             for name in ["stage", "current_holder", "first_note"]:
                 self.fields.pop(name)
 
+    def clean(self):
+        data = super().clean()
+        if data.get("my_role") == "executing" and "current_holder" in self.fields:
+            data["current_holder"] = None  # it's on my own desk
+        return data
+
 
 class UpdateForm(forms.ModelForm):
     class Meta:
