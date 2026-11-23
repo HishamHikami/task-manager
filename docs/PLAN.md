@@ -64,7 +64,7 @@ Nothing in this repository contains or uses anyone's credentials.
 Chosen to be light enough for a **1 GB RAM** server shared with other apps, and
 easy for anyone to self-host.
 
-- **Backend:** Python 3.12, **Django**, served by **gunicorn** (2 workers) behind **nginx**, run as a **systemd** service under its own user.
+- **Backend:** Python 3.12, **Django**, served by **gunicorn** (1 worker, 4 threads) behind **nginx**, run as a **systemd** service under its own user.
 - **Database:** **SQLite** (WAL mode) — one file, zero extra memory.
 - **Frontend:** server-rendered Django templates + **HTMX** for interactivity; small hand-written CSS; no heavy JS build step.
 - **PWA:** web app manifest, service worker, Web Share Target (Android).
@@ -73,7 +73,7 @@ easy for anyone to self-host.
 - **No Docker required** (Docker remains an option for others later).
 - **No GitHub Actions** in this repo unless each workflow is reviewed.
 
-Expected footprint: roughly 60–120 MB RAM.
+Expected footprint: roughly 70 MB RAM.
 
 ---
 

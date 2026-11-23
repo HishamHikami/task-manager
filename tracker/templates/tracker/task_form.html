@@ -1,0 +1,17 @@
+{% extends "tracker/base.html" %}
+{% block title %}{% if task %}Edit task{% else %}New task{% endif %}{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>{% if task %}Edit task{% else %}Register a task{% endif %} <span class="tag c-{{ workspace.color }}">{{ workspace.name }}</span></h1>
+  {% if task %}<p class="muted">To change who has it or its stage, use <em>Hand off</em> and <em>Move stage</em> on the task page so the change is recorded on the timeline.</p>{% endif %}
+  <form method="post">
+    {% csrf_token %}
+    {% include "tracker/partials/form_fields.html" %}
+    <div class="actions">
+      <button class="btn btn-primary" type="submit">{% if task %}Save{% else %}Register task{% endif %}</button>
+      <a class="btn" href="{% if task %}{{ task.get_absolute_url }}{% else %}{% url 'dashboard' %}{% endif %}">Cancel</a>
+      {% if task %}<a class="btn btn-danger right" href="{% url 'task_delete' task.pk %}">Delete</a>{% endif %}
+    </div>
+  </form>
+</div>
+{% endblock %}

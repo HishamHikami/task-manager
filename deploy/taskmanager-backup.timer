@@ -1,0 +1,11 @@
+# /etc/systemd/system/taskmanager-backup.timer
+[Unit]
+Description=Run Task Manager backup nightly
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+RandomizedDelaySec=15m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

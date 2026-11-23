@@ -1,0 +1,10 @@
+# /etc/systemd/system/taskmanager-backup.service
+[Unit]
+Description=Task Manager nightly database backup
+
+[Service]
+Type=oneshot
+User=taskmanager
+Group=taskmanager
+Environment=DATA_DIR=/var/lib/taskmanager
+ExecStart=/srv/taskmanager/deploy/backup.sh

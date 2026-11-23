@@ -1,0 +1,12 @@
+{% extends "tracker/base.html" %}
+{% block title %}New task{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>Which workspace is this for?</h1>
+  <div class="pickgrid">
+    {% for ws in workspaces %}
+    <a class="pick c-{{ ws.color }}" href="{% url 'task_create' ws.pk %}">{{ ws.name }}</a>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

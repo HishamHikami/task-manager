@@ -1,0 +1,49 @@
+{% extends "tracker/base.html" %}
+{% block title %}{{ workspace.name }}{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <h1><span class="dot c-{{ workspace.color }}"></span>{{ workspace.name }}</h1>
+  <div>
+    <a class="btn" href="{% url 'dashboard' %}?ws={{ workspace.pk }}">Open dashboard</a>
+    <a class="btn" href="{% url 'workspace_edit' workspace.pk %}">Edit</a>
+  </div>
+</div>
+{% if workspace.description %}<p class="muted">{{ workspace.description }}</p>{% endif %}
+<p class="muted">AI summaries: {% if workspace.ai_enabled %}allowed{% else %}<strong>off</strong> — text from this workspace is never sent to AI{% endif %}.</p>
+
+<div class="twocol">
+  <section class="card">
+    <div class="cardhead">
+      <h2>Departments &amp; people</h2>
+      <a class="btn btn-small btn-primary" href="{% url 'holder_create' workspace.pk %}">+ Add</a>
+    </div>
+    <table class="list">
+      {% for h in holders %}
+      <tr class="{% if not h.active %}inactive{% endif %}">
+        <td><strong>{{ h.name }}</strong><br><small class="muted">{{ h.get_kind_display }}{% if h.contact %} · {{ h.contact }}{% endif %}{% if not h.active %} · inactive{% endif %}</small></td>
+        <td class="num"><a href="{% url 'task_list' %}?ws={{ workspace.pk }}&holder={{ h.pk }}">{{ h.open_count }} open</a></td>
+        <td class="num"><a href="{% url 'holder_edit' h.pk %}">Edit</a></td>
+      </tr>
+      {% empty %}
+      <tr><td class="muted">Nobody yet. Add the departments, committees or people you hand tasks to.</td></tr>
+      {% endfor %}
+    </table>
+  </section>
+
+  <section class="card">
+    <div class="cardhead">
+      <h2>Stages</h2>
+      <a class="btn btn-small btn-primary" href="{% url 'stage_create' workspace.pk %}">+ Add</a>
+    </div>
+    <table class="list">
+      {% for s in stages %}
+      <tr>
+        <td><strong>{{ s.name }}</strong>{% if s.is_closed %} <small class="tag stage-closed">closes task</small>{% endif %}<br><small class="muted">order {{ s.order }} · {{ s.task_count }} task{{ s.task_count|pluralize }}</small></td>
+        <td class="num"><a href="{% url 'stage_edit' s.pk %}">Edit</a></td>
+        <td class="num">{% if not s.task_count %}<form method="post" action="{% url 'stage_delete' s.pk %}">{% csrf_token %}<button class="linklike text-red" type="submit">Remove</button></form>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </section>
+</div>
+{% endblock %}

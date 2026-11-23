@@ -1,0 +1,39 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1f3a5f">
+  <title>{% block title %}Tasks{% endblock %} · Task Manager</title>
+  <link rel="stylesheet" href="{% static 'tracker/app.css' %}">
+  <script src="{% static 'tracker/htmx.min.js' %}" defer></script>
+</head>
+<body hx-boost="true" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+{% if user.is_authenticated %}
+<header class="topbar">
+  <a class="brand" href="{% url 'dashboard' %}">Task Manager</a>
+  <nav class="mainnav">
+    <a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">Dashboard</a>
+    <a href="{% url 'task_list' %}" class="{% if request.resolver_match.url_name == 'task_list' %}active{% endif %}">Tasks</a>
+    <a href="{% url 'workspace_list' %}" class="{% if 'workspace' in request.resolver_match.url_name %}active{% endif %}">Workspaces</a>
+  </nav>
+  <a class="btn btn-primary btn-new" href="{% url 'task_new' %}">+ New task</a>
+  <form method="post" action="{% url 'logout' %}" class="logout">{% csrf_token %}<button class="linklike" type="submit">Log out</button></form>
+</header>
+{% if nav_workspaces and request.resolver_match.url_name in 'dashboard,task_list' %}
+<div class="wsbar">
+  <a href="?ws=all" class="chip {% if not nav_selected_ws %}chip-on{% endif %}">All</a>
+  {% for ws in nav_workspaces %}
+  <a href="?ws={{ ws.pk }}" class="chip c-{{ ws.color }} {% if nav_selected_ws == ws.pk %}chip-on{% endif %}">{{ ws.name }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endif %}
+<main class="container">
+  {% for message in messages %}
+  <div class="flash flash-{{ message.tags }}">{{ message }}</div>
+  {% endfor %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

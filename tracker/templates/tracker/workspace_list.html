@@ -1,0 +1,19 @@
+{% extends "tracker/base.html" %}
+{% block title %}Workspaces{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <h1>Workspaces</h1>
+  <a class="btn btn-primary" href="{% url 'workspace_create' %}">+ New workspace</a>
+</div>
+<div class="wsgrid">
+  {% for ws in workspaces %}
+  <a class="card wscard c-{{ ws.color }} {% if ws.archived %}archived{% endif %}" href="{{ ws.get_absolute_url }}">
+    <h2>{{ ws.name }}{% if ws.archived %} <span class="muted">(archived)</span>{% endif %}</h2>
+    {% if ws.description %}<p class="muted">{{ ws.description }}</p>{% endif %}
+    <p>{{ ws.open_count }} open · {{ ws.holder_count }} departments/people{% if not ws.ai_enabled %} · AI off{% endif %}</p>
+  </a>
+  {% empty %}
+  <div class="card empty"><p>No workspaces yet.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

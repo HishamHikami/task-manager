@@ -1,0 +1,28 @@
+{% extends "tracker/base.html" %}
+{% block title %}Tasks{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <h1>Tasks{% if workspace %} · {{ workspace.name }}{% endif %}</h1>
+</div>
+<form class="filters card" method="get" hx-get="{% url 'task_list' %}" hx-trigger="change, keyup changed delay:400ms from:input[name=q]" hx-target="body" hx-push-url="true">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search tasks and timeline text…">
+  <select name="status">
+    <option value="open" {% if status == 'open' %}selected{% endif %}>Open</option>
+    <option value="closed" {% if status == 'closed' %}selected{% endif %}>Finished</option>
+    <option value="all" {% if status == 'all' %}selected{% endif %}>All</option>
+  </select>
+  <select name="holder">
+    <option value="">Anyone</option>
+    {% for h in holders %}<option value="{{ h.pk }}" {% if holder_id == h.pk|stringformat:'s' %}selected{% endif %}>{{ h.name }}{% if not workspace %} ({{ h.workspace.name }}){% endif %}</option>{% endfor %}
+  </select>
+  <select name="role">
+    <option value="">Any role</option>
+    {% for value, label in roles %}<option value="{{ value }}" {% if role == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <noscript><button class="btn" type="submit">Filter</button></noscript>
+</form>
+<div class="card">
+  {% for task in tasks %}{% include "tracker/partials/task_row.html" %}
+  {% empty %}<p class="muted">No tasks match.</p>{% endfor %}
+</div>
+{% endblock %}

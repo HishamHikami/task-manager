@@ -1,0 +1,54 @@
+{% extends "tracker/base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <h1>{% if workspace %}{{ workspace.name }}{% else %}All workspaces{% endif %}</h1>
+  <span class="muted">{{ open_count }} open task{{ open_count|pluralize }}</span>
+</div>
+
+{% if not nav_workspaces %}
+<div class="card empty">
+  <h2>Welcome</h2>
+  <p>Start by creating a workspace for each area you track, for example <strong>Company</strong> and your <strong>organization</strong>. Then add the departments and people who handle tasks.</p>
+  <a class="btn btn-primary" href="{% url 'workspace_create' %}">Create a workspace</a>
+</div>
+{% else %}
+
+{% if overdue or follow_ups %}
+<section class="attention">
+  {% if follow_ups %}
+  <div class="card">
+    <h2>🔔 Needs a nudge today <span class="count">{{ follow_ups|length }}</span></h2>
+    {% for task in follow_ups %}
+      {% include "tracker/partials/task_row.html" %}
+      {% if task.follow_up_note %}<div class="fu-note">↳ {{ task.follow_up_note }}</div>{% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if overdue %}
+  <div class="card">
+    <h2>⏰ Overdue <span class="count">{{ overdue|length }}</span></h2>
+    {% for task in overdue %}{% include "tracker/partials/task_row.html" %}{% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+<h2 class="section">On whose desk</h2>
+{% for holder, tasks in by_holder.items %}
+<div class="card holdergroup">
+  <h3>{{ holder }} <span class="count">{{ tasks|length }}</span></h3>
+  {% for task in tasks %}{% include "tracker/partials/task_row.html" %}{% endfor %}
+</div>
+{% empty %}
+<div class="card empty"><p>No open tasks. <a href="{% url 'task_new' %}">Register one</a>.</p></div>
+{% endfor %}
+
+{% if recent_closed %}
+<h2 class="section">Recently finished</h2>
+<div class="card">
+  {% for task in recent_closed %}{% include "tracker/partials/task_row.html" %}{% endfor %}
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

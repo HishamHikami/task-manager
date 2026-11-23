@@ -1,0 +1,39 @@
+# /etc/systemd/system/taskmanager.service
+[Unit]
+Description=Task Manager (gunicorn)
+After=network.target
+
+[Service]
+Type=notify
+User=taskmanager
+Group=www-data
+# Read by systemd as root before dropping privileges, so it can be root:root 600.
+EnvironmentFile=/etc/taskmanager/env
+WorkingDirectory=/srv/taskmanager
+ExecStart=/srv/taskmanager/.venv/bin/gunicorn config.wsgi:application \
+    --bind unix:/run/taskmanager/gunicorn.sock \
+    --umask 007 \
+    --workers 1 --threads 4 --worker-class gthread \
+    --max-requests 1000 --max-requests-jitter 100 \
+    --timeout 60 \
+    --access-logfile -
+RuntimeDirectory=taskmanager
+RuntimeDirectoryMode=0750
+StateDirectory=taskmanager
+StateDirectoryMode=0750
+Restart=on-failure
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryMax=300M
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,18 @@
+<a class="taskrow p{{ task.priority }}" href="{{ task.get_absolute_url }}">
+  <div class="taskrow-main">
+    <span class="taskrow-title">{{ task.title }}</span>
+    <span class="taskrow-meta">
+      <span class="tag c-{{ task.workspace.color }}">{{ task.workspace.name }}</span>
+      <span class="tag stage">{{ task.stage.name }}</span>
+      {% if task.current_holder %}<span class="holder">👤 {{ task.current_holder.name }}{% if not task.is_closed %} · {{ task.days_with_holder }}d{% endif %}</span>{% endif %}
+      {% if task.reference %}<span class="muted">#{{ task.reference }}</span>{% endif %}
+    </span>
+  </div>
+  <div class="taskrow-dates">
+    {% if task.is_overdue %}<span class="badge badge-red">Overdue {{ task.due_date|date:"d M" }}</span>
+    {% elif task.due_date %}<span class="badge">Due {{ task.due_date|date:"d M" }}</span>{% endif %}
+    {% if task.follow_up_due %}<span class="badge badge-amber">Follow up</span>
+    {% elif task.follow_up_date and not task.is_closed %}<span class="badge badge-soft">Check {{ task.follow_up_date|date:"d M" }}</span>{% endif %}
+    {% if task.priority >= 3 %}<span class="badge badge-pri">{{ task.get_priority_display }}</span>{% endif %}
+  </div>
+</a>
