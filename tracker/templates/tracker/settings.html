@@ -1,0 +1,44 @@
+{% extends "tracker/base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>Settings</h1>
+
+  <h2>AI summaries</h2>
+  <p class="muted">Uses your own Anthropic API key. It's stored encrypted on this server and only used for the summaries you ask for. Anyone else running a copy of this app uses their own key.</p>
+  <p>Key: {% if s.has_api_key %}<strong>saved</strong> <span class="muted">({{ s.anthropic_key_hint }})</span>{% else %}<strong>not set</strong>{% endif %}</p>
+  <form method="post">
+    {% csrf_token %}
+    {% include "tracker/partials/form_fields.html" %}
+    <div class="actions">
+      <button class="btn btn-primary" type="submit">Save</button>
+      {% if s.has_api_key %}<button class="btn" type="submit" name="test" value="1" formnovalidate>Test the key</button>{% endif %}
+    </div>
+  </form>
+  <details class="help-box">
+    <summary>How to get a key</summary>
+    <ol>
+      <li>Sign in at <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a> (this is separate from a Claude Pro subscription).</li>
+      <li>Add a little credit under <em>Billing</em>, and set a monthly <em>spend limit</em> (e.g. $5) as a safety net.</li>
+      <li>Create a key under <em>API keys</em>, copy it, paste it above and press Save.</li>
+    </ol>
+  </details>
+
+  <h2 class="mt">Usage this month</h2>
+  <p>{{ usage.calls }} AI request{{ usage.calls|pluralize }} · {{ usage.input_tokens }} tokens in · {{ usage.output_tokens }} tokens out ·
+     about <strong>${{ usage.cost|floatformat:4 }}</strong>{% if usage.errors %} · {{ usage.errors }} failed{% endif %}</p>
+  {% if recent_errors %}<details><summary class="muted">Recent problems</summary><ul>{% for r in recent_errors %}<li class="muted">{{ r.created_at|date:"d M H:i" }} — {{ r.error }}</li>{% endfor %}</ul></details>{% endif %}
+
+  <h2 class="mt">Which workspaces may use AI</h2>
+  <ul class="plainlist">
+    {% for w in workspaces %}<li><a href="{% url 'workspace_edit' w.pk %}">{{ w.name }}</a>: {% if w.ai_enabled %}allowed{% else %}<strong>off</strong> — never sent to AI{% endif %}</li>{% endfor %}
+  </ul>
+
+  <h2 class="mt">Phone app</h2>
+  <p class="muted">On Android, open this site in Chrome and tap <em>Install app</em> (or ⋮ → <em>Add to Home screen</em> → <em>Install</em>). Then in WhatsApp, Outlook or Gmail, long-press a message → <em>Share</em> → <strong>Tasks</strong> to send it to Quick capture.</p>
+  <button type="button" class="btn btn-install" data-install hidden>⤓ Install app</button>
+
+  <h2 class="mt">Account</h2>
+  <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="btn" type="submit">Log out</button></form>
+</div>
+{% endblock %}

@@ -14,7 +14,7 @@
     <div><dt>When</dt><dd>{{ event.start|date:"D d M Y, H:i" }}{% if event.end %}<br><span class="muted">until {% if event.end|date:"Ymd" == event.start|date:"Ymd" %}{{ event.end|date:"H:i" }}{% else %}{{ event.end|date:"D d M Y, H:i" }}{% endif %}</span>{% endif %}</dd></div>
     {% if event.location or event.online_link %}<div><dt>Where</dt><dd>{% if event.location %}{{ event.location }}{% endif %}{% if event.online_link %}<br><a href="{{ event.online_link }}" target="_blank" rel="noopener noreferrer">💻 Join online</a>{% endif %}</dd></div>{% endif %}
     {% if event.organizer_name %}<div><dt>Organized / invited by</dt><dd><strong>{{ event.organizer_name }}</strong>
-      {% with p=event.organizer_contact|default:event.organizer.primary_contact %}{% if p %}{% include "tracker/partials/contact_links.html" %}{% elif event.organizer %}{% include "tracker/partials/contact_links.html" with p=event.organizer %}{% endif %}{% endwith %}</dd></div>{% endif %}
+      {% with p=event.organizer_person %}{% if p %}{% include "tracker/partials/contact_links.html" %}{% elif event.organizer %}{% include "tracker/partials/contact_links.html" with p=event.organizer %}{% endif %}{% endwith %}</dd></div>{% endif %}
     {% if event.my_topic %}<div><dt>My topic</dt><dd>🎤 {{ event.my_topic }}{% if event.duration_minutes %}<br><span class="muted">{{ event.duration_minutes }} minutes</span>{% endif %}</dd></div>{% endif %}
     {% if event.audience %}<div><dt>Audience</dt><dd>{{ event.audience }}</dd></div>{% endif %}
   </dl>

@@ -1,0 +1,20 @@
+{% extends "tracker/base.html" %}
+{% block title %}Quick capture{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>⚡ Quick capture</h1>
+  <p class="muted">Paste an email, WhatsApp message or meeting minutes{% if ai_ready %} and the AI suggests a short summary, the task it belongs to, who has it and any dates. You check everything before it's saved{% endif %}.</p>
+  {% if not ai_ready %}
+  <div class="flash flash-info">AI isn't set up yet — you can still save messages by hand. To get summaries, add your Anthropic API key in <a href="{% url 'settings' %}">Settings</a>.</div>
+  {% endif %}
+  <form method="post" class="captureform">
+    {% csrf_token %}
+    {% include "tracker/partials/form_fields.html" %}
+    <div class="actions">
+      {% if ai_ready %}<button class="btn btn-primary" type="submit" name="use_ai" value="1" data-busy="Reading…">✨ Summarize with AI</button>{% endif %}
+      <button class="btn{% if not ai_ready %} btn-primary{% endif %}" type="submit" name="manual" value="1">Save without AI</button>
+    </div>
+    {% if ai_off_workspaces %}<small class="help">AI is off for: {% for w in ai_off_workspaces %}{{ w.name }}{% if not forloop.last %}, {% endif %}{% endfor %} — their text is never sent.</small>{% endif %}
+  </form>
+</div>
+{% endblock %}

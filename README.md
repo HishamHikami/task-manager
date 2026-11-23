@@ -8,7 +8,7 @@ WhatsApp messages and meeting minutes.
 
 Built with Django + SQLite + HTMX. Light enough for a 1 GB server.
 
-## Features (Phase 1)
+## Features
 - Workspaces with their own departments/people and configurable stages
 - Tasks with priority, due date, your role (assigned / following up / doing it), reference no.
 - **Hand-offs** — move a task to someone else's desk; the full chain is kept
@@ -16,8 +16,14 @@ Built with Django + SQLite + HTMX. Light enough for a 1 GB server.
 - **Dashboard** — follow-ups due today, overdue tasks, and open tasks grouped by who holds them
 - Search across tasks and timeline text; mobile-friendly; light/dark mode
 
-Coming next: AI summaries with your own Anthropic API key (Claude Haiku), Android
-share-to-app, optional email intake. See [docs/PLAN.md](docs/PLAN.md).
+- People inside departments with roles; assign tasks to a specific person; one-click copy of phone/email
+- **Events** with your role (host, speaker, guest…), invitation status and add-to-calendar
+- **Quick capture with AI** (optional): paste or share an email/WhatsApp message and Claude Haiku
+  suggests a summary, the task, who has it and dates — you review before saving.
+  Uses **your own** Anthropic API key, entered in Settings and stored encrypted.
+- **Installable phone app** (PWA) with Android *Share → Tasks*
+
+Next ideas: optional email intake, attachments, daily digest. See [docs/PLAN.md](docs/PLAN.md).
 
 ## Try it locally
 

@@ -1,7 +1,7 @@
 from django import forms
 from django.utils import timezone
 
-from .models import Contact, Event, Holder, Stage, Task, Update, Workspace
+from .models import AppSettings, Contact, Event, Holder, Stage, Task, Update, Workspace
 
 
 class DateInput(forms.DateInput):
@@ -349,3 +349,86 @@ class EventForm(forms.ModelForm):
 
 class EventStatusForm(forms.Form):
     status = forms.ChoiceField(choices=Event.STATUS_CHOICES)
+
+
+# --- AI: quick capture & settings ---------------------------------------------------
+
+class CaptureForm(forms.Form):
+    text = forms.CharField(
+        label="Message", widget=forms.Textarea(attrs={"rows": 9, "placeholder":
+            "Paste an email, WhatsApp message or meeting minutes — or share it here from your phone."}),
+    )
+    workspace = forms.ModelChoiceField(queryset=Workspace.objects.filter(archived=False), empty_label=None)
+
+
+class CaptureReviewForm(forms.Form):
+    ACTIONS = [("update_task", "Add to an existing task"), ("new_task", "Register a new task"),
+               ("new_event", "Add as an event")]
+
+    workspace = forms.ModelChoiceField(queryset=Workspace.objects.all(), widget=forms.HiddenInput)
+    body = forms.CharField(widget=forms.HiddenInput, required=False)
+    summary = forms.CharField(widget=forms.Textarea(attrs={"rows": 2}), required=False)
+    kind = forms.ChoiceField(label="It's a", choices=[c for c in Update.KIND_CHOICES if c[0] in Update.MANUAL_KINDS])
+    source = forms.CharField(label="From", max_length=200, required=False)
+    action = forms.ChoiceField(label="What to do with it", choices=ACTIONS, widget=forms.RadioSelect)
+    # existing task
+    task = forms.ModelChoiceField(queryset=Task.objects.none(), required=False, label="Task")
+    handoff = forms.BooleanField(required=False, label="Also record a hand-off to this person")
+    # new task
+    new_task_title = forms.CharField(label="New task title", max_length=200, required=False)
+    my_role = forms.ChoiceField(label="My role", choices=Task.ROLE_CHOICES, initial="following", required=False)
+    # shared
+    desk = DeskChoiceField(label="Who has it now", required=False)
+    next_action = forms.CharField(label="Next action / what to check", max_length=200, required=False)
+    due_date = forms.DateField(label="Due date", widget=DateInput(), required=False)
+    follow_up_date = forms.DateField(label="Follow up on", widget=DateInput(), required=False)
+    # event
+    event_title = forms.CharField(label="Event title", max_length=200, required=False)
+    event_kind = forms.ChoiceField(label="Type of event", choices=Event.KIND_CHOICES, required=False, initial="meeting")
+    event_my_role = forms.ChoiceField(label="My role at the event", choices=Event.ROLE_CHOICES, required=False,
+                                      initial="guest")
+    event_start = forms.DateTimeField(label="Starts", widget=DateTimeInput(), required=False)
+    event_end = forms.DateTimeField(label="Ends", widget=DateTimeInput(), required=False)
+    event_location = forms.CharField(label="Where", max_length=200, required=False)
+
+    def __init__(self, *args, workspace, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.workspace = workspace
+        self.fields["task"].queryset = workspace.tasks.open().select_related(
+            "current_holder", "current_contact__holder").prefetch_related("current_holder__contacts")
+        self.fields["task"].label_from_instance = lambda t: f"{t.title} — {t.desk_name or 'me'}"
+        self.fields["desk"].set_workspace(workspace)
+
+    def clean(self):
+        data = super().clean()
+        action = data.get("action")
+        if action == "update_task" and not data.get("task"):
+            self.add_error("task", "Choose the task this belongs to.")
+        if action == "new_task" and not (data.get("new_task_title") or "").strip():
+            self.add_error("new_task_title", "Give the new task a title.")
+        if action == "new_event":
+            if not (data.get("event_title") or "").strip():
+                self.add_error("event_title", "Give the event a title.")
+            if not data.get("event_start"):
+                self.add_error("event_start", "When does it start?")
+            elif data.get("event_end") and data["event_end"] < data["event_start"]:
+                self.add_error("event_end", "The end can't be before the start.")
+        if not (data.get("body") or "").strip() and not (data.get("summary") or "").strip():
+            raise forms.ValidationError("There's nothing to save.")
+        return data
+
+
+class SettingsForm(forms.Form):
+    api_key = forms.CharField(
+        label="Anthropic API key", required=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "off", "placeholder": "sk-ant-…"}),
+        help_text="Leave empty to keep the saved key.",
+    )
+    remove_key = forms.BooleanField(label="Remove the saved key", required=False)
+    ai_model = forms.ChoiceField(label="AI model", choices=AppSettings.MODEL_CHOICES)
+
+    def clean_api_key(self):
+        key = self.cleaned_data["api_key"].strip()
+        if key and (not key.startswith("sk-ant-") or len(key) < 30 or " " in key):
+            raise forms.ValidationError("That doesn't look like an Anthropic API key (it starts with sk-ant-).")
+        return key

@@ -453,9 +453,65 @@ class Event(models.Model):
         return self.organizer_other
 
     @property
+    def organizer_person(self):
+        """The person to contact about the event, if known."""
+        if self.organizer_contact_id:
+            return self.organizer_contact
+        return self.organizer.primary_contact if self.organizer_id else None
+
+    @property
     def needs_answer(self):
         return self.status == "invited"
 
     @property
     def is_off(self):
         return self.status in {"declined", "cancelled"}
+
+
+class AppSettings(models.Model):
+    """Single row of app-wide settings, edited on the Settings page."""
+
+    MODEL_CHOICES = [
+        ("claude-haiku-5-5", "Claude Haiku 5.5 — fast and cheapest (recommended)"),
+        ("claude-sonnet-5-5", "Claude Sonnet 5.5 — smarter, ~20× the cost"),
+    ]
+
+    anthropic_key_encrypted = models.TextField(blank=True)
+    anthropic_key_hint = models.CharField(max_length=12, blank=True)
+    ai_model = models.CharField(max_length=40, choices=MODEL_CHOICES, default="claude-haiku-5-5")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "settings"
+        verbose_name_plural = "settings"
+
+    def __str__(self):
+        return "Settings"
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    @property
+    def has_api_key(self):
+        return bool(self.anthropic_key_encrypted)
+
+
+class AIUsage(models.Model):
+    """One AI call: what for, how many tokens, and (for reuse) the result."""
+
+    PURPOSE_CHOICES = [("capture", "Quick capture"), ("summary", "Summarize update"), ("test", "Connection test")]
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    purpose = models.CharField(max_length=10, choices=PURPOSE_CHOICES)
+    model = models.CharField(max_length=40)
+    input_tokens = models.PositiveIntegerField(default=0)
+    output_tokens = models.PositiveIntegerField(default=0)
+    ok = models.BooleanField(default=True)
+    error = models.CharField(max_length=200, blank=True)
+    text_hash = models.CharField(max_length=64, blank=True, db_index=True)
+    result = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]

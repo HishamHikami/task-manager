@@ -114,7 +114,20 @@ Generic Ubuntu + nginx + certbot + systemd layout, matching common single-drople
 
 ---
 
-## 8. Phases
+## 8. Status (November 2026)
+
+**Built and live**
+- Workspaces, stages, tasks, hand-offs, timeline, follow-ups, dashboard grouped by whose desk.
+- Departments/committees with **people inside them** (role, phone, email, main contact), and tasks
+  assigned to a **specific person** or the whole department. One-click copy for phone/email.
+- "I'm doing it" tasks sit **on my desk**.
+- **Events**: my role (host, speaker, panelist, guest…), status (invited → confirmed/declined → done),
+  organizer, topic, preparation; dashboard "coming up"; add to calendar (.ics).
+- **AI (Phase 2)**: Quick capture with Claude Haiku 5.5 — summary + suggested task/person/dates/event,
+  always reviewed before saving; "Summarize" on timeline entries; encrypted key and usage on Settings.
+- **Phone app (Phase 3)**: installable from Chrome; Android **Share → Tasks** opens Quick capture.
+
+## 9. Original phases
 
 1. **MVP** — workspaces, units/people, stages, tasks, hand-offs, timeline updates, follow-ups, dashboard by holder, owner login.
 2. **AI** — Quick capture with Haiku 5.5 summary + suggested task; encrypted key in Settings; usage tracking.

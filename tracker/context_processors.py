@@ -1,4 +1,4 @@
-from .models import Workspace
+from .models import AppSettings, Workspace
 
 
 def workspaces(request):
@@ -7,4 +7,5 @@ def workspaces(request):
     return {
         "nav_workspaces": Workspace.objects.filter(archived=False),
         "nav_selected_ws": request.session.get("ws"),
+        "ai_ready": AppSettings.load().has_api_key,
     }

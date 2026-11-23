@@ -136,3 +136,62 @@
     });
   });
 })();
+
+// Quick capture review: show only the fields for the chosen action.
+(function () {
+  function sync() {
+    document.querySelectorAll("form.reviewform").forEach(function (form) {
+      var checked = form.querySelector('input[name="action"]:checked');
+      var action = checked ? checked.value : "";
+      form.querySelectorAll(".when").forEach(function (el) {
+        el.hidden = !el.classList.contains("when-" + action);
+      });
+      form.querySelectorAll(".radiocard").forEach(function (card) {
+        card.classList.toggle("on", card.querySelector("input").checked);
+      });
+    });
+  }
+  document.addEventListener("change", function (e) {
+    if (e.target.name === "action" && e.target.closest("form.reviewform")) sync();
+  });
+  document.addEventListener("DOMContentLoaded", sync);
+  document.addEventListener("htmx:afterSwap", sync);
+  document.addEventListener("htmx:afterSettle", sync);
+})();
+
+// Buttons that call the AI: show that something is happening (it takes a few seconds).
+document.addEventListener("submit", function (e) {
+  var btn = e.submitter;
+  if (btn && btn.dataset.busy) {
+    // Keep the button's name/value in the submission, then disable it.
+    var hidden = document.createElement("input");
+    hidden.type = "hidden"; hidden.name = btn.name; hidden.value = btn.value;
+    if (btn.name) e.target.appendChild(hidden);
+    setTimeout(function () { btn.disabled = true; btn.textContent = btn.dataset.busy; }, 0);
+  }
+});
+
+// Installable app: service worker + "Install app" button when Chrome offers it.
+(function () {
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(function () { /* not critical */ });
+    });
+  }
+  var deferred = null;
+  function buttons() { return document.querySelectorAll("#install-btn, [data-install]"); }
+  function show(on) { buttons().forEach(function (b) { b.hidden = !on; }); }
+  window.addEventListener("beforeinstallprompt", function (e) {
+    e.preventDefault();
+    deferred = e;
+    show(true);
+  });
+  window.addEventListener("appinstalled", function () { deferred = null; show(false); });
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest && e.target.closest("#install-btn, [data-install]");
+    if (!b || !deferred) return;
+    deferred.prompt();
+    deferred.userChoice.finally(function () { deferred = null; show(false); });
+  });
+  document.addEventListener("htmx:afterSettle", function () { show(!!deferred); });
+})();

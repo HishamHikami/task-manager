@@ -83,6 +83,9 @@
     {% endif %}
     {% if u.source %}<p class="tl-source">From: {{ u.source }}</p>{% endif %}
     {% if u.summary %}<p class="tl-summary">{{ u.summary|linebreaksbr }}</p>{% endif %}
+    {% if ai_ready and task.workspace.ai_enabled and u.body and not u.summary and u.kind in "email whatsapp meeting call note" %}
+    <form method="post" action="{% url 'update_summarize' u.pk %}" class="inline-form">{% csrf_token %}<button class="btn btn-small" type="submit" data-busy="Summarizing…">✨ Summarize</button></form>
+    {% endif %}
     {% if u.body %}
       {% if u.summary or u.body|length > 400 %}
       <details class="tl-body"><summary>{% if u.summary %}Original text{% else %}Show full text{% endif %}</summary><div class="pre">{{ u.body }}</div></details>

@@ -293,3 +293,33 @@ td .contactlinks { margin-top: 2px; font-size: .85rem; }
 .statusbar { display: flex; gap: 6px; flex-wrap: wrap; margin: 0; }
 .prewrap { white-space: pre-wrap; word-break: break-word; }
 .statuslabel { align-self: center; font-size: .9rem; }
+
+/* Header actions */
+.topactions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.iconbtn { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; color: var(--muted); font-size: 1.15rem; }
+.iconbtn:hover, .iconbtn.active { background: var(--bg); color: var(--text); text-decoration: none; }
+.btn-install { border-color: var(--accent); color: var(--accent); }
+@media (max-width: 600px) {
+  .brand { flex: 1; }
+  .topactions { gap: 6px; }
+  .topactions .btn { padding: 7px 10px; }
+  .topactions .logout { display: none; }
+  .hide-xs { display: none; }
+}
+
+/* Quick capture */
+.original { margin: 8px 0 14px; }
+.original summary { cursor: pointer; color: var(--accent); }
+.row2 { display: grid; gap: 0 12px; grid-template-columns: 1fr; }
+@media (min-width: 560px) { .row2 { grid-template-columns: 1fr 1fr; } }
+fieldset.choose { border: 0; padding: 0; margin: 4px 0 12px; display: grid; gap: 6px; }
+fieldset.choose legend { font-weight: 600; font-size: .9rem; margin-bottom: 6px; }
+.radiocard { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.radiocard.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.when[hidden] { display: none; }
+.inline-form { margin: 4px 0 0; }
+.help-box { margin: 10px 0; }
+.help-box summary { cursor: pointer; color: var(--accent); }
+.help-box ol { padding-left: 20px; }
+.mt { margin-top: 22px; }
+.plainlist { padding-left: 18px; }

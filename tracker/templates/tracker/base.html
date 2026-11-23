@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#1f3a5f">
   <title>{% block title %}Tasks{% endblock %} · Task Manager</title>
+  <link rel="manifest" href="{% url 'manifest' %}">
+  <link rel="icon" href="{% static 'tracker/icons/icon.svg' %}" type="image/svg+xml">
+  <link rel="icon" href="{% static 'tracker/icons/favicon-32.png' %}" sizes="32x32">
+  <link rel="apple-touch-icon" href="{% static 'tracker/icons/apple-touch-icon.png' %}">
+  <meta name="mobile-web-app-capable" content="yes">
   <link rel="stylesheet" href="{% static 'tracker/app.css' %}">
   <script src="{% static 'tracker/htmx.min.js' %}" defer></script>
   <script src="{% static 'tracker/app.js' %}" defer></script>
@@ -19,8 +24,13 @@
     <a href="{% url 'event_list' %}" class="{% if 'event' in request.resolver_match.url_name %}active{% endif %}">Events</a>
     <a href="{% url 'workspace_list' %}" class="{% if 'workspace' in request.resolver_match.url_name %}active{% endif %}">Workspaces</a>
   </nav>
-  <a class="btn btn-primary btn-new" href="{% url 'task_new' %}">+ New task</a>
-  <form method="post" action="{% url 'logout' %}" class="logout">{% csrf_token %}<button class="linklike" type="submit">Log out</button></form>
+  <div class="topactions">
+    <button type="button" class="btn btn-install" id="install-btn" hidden>⤓ Install<span class="hide-xs"> app</span></button>
+    <a class="btn" href="{% url 'capture' %}" title="Paste or share a message">⚡ Capture</a>
+    <a class="btn btn-primary" href="{% url 'task_new' %}">+ <span class="hide-xs">New </span>task</a>
+    <a class="iconbtn {% if request.resolver_match.url_name == 'settings' %}active{% endif %}" href="{% url 'settings' %}" title="Settings" aria-label="Settings">⚙</a>
+    <form method="post" action="{% url 'logout' %}" class="logout">{% csrf_token %}<button class="linklike" type="submit">Log out</button></form>
+  </div>
 </header>
 {% if nav_workspaces and request.resolver_match.url_name in 'dashboard,task_list,event_list' %}
 <div class="wsbar">

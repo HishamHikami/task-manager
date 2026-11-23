@@ -1,3 +1,4 @@
+import re
 from collections import OrderedDict
 from datetime import timedelta
 from datetime import timezone as dt_timezone
@@ -9,7 +10,9 @@ from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_not_required
 from django.core.cache import cache
 from django.db.models import Count, Q
-from django.http import HttpResponse
+from django.db import transaction
+from django.http import HttpResponse, JsonResponse
+from django.templatetags.static import static
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -19,6 +22,8 @@ from django.views.decorators.http import require_POST
 
 from . import services
 from .forms import (
+    CaptureForm,
+    CaptureReviewForm,
     ContactForm,
     EventForm,
     EventStatusForm,
@@ -30,9 +35,11 @@ from .forms import (
     StageForm,
     TaskForm,
     UpdateForm,
+    SettingsForm,
     WorkspaceForm,
 )
-from .models import Contact, Event, Holder, Stage, Task, Workspace
+from . import ai
+from .models import AIUsage, AppSettings, Contact, Event, Holder, Stage, Task, Update, Workspace
 
 
 # --- Login with simple throttling -------------------------------------------------
@@ -694,7 +701,7 @@ def event_delete(request, pk):
 
 
 def _ics_text(value):
-    return (value or "").replace("\\", "\\\\").replace(";", "\;").replace(",", "\\,").replace("\n", "\\n")
+    return (value or "").replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 
 
 def event_ics(request, pk):
@@ -727,3 +734,238 @@ def event_ics(request, pk):
     resp = HttpResponse("\r\n".join(lines) + "\r\n", content_type="text/calendar; charset=utf-8")
     resp["Content-Disposition"] = f'attachment; filename="event-{event.pk}.ics"'
     return resp
+
+
+# --- Quick capture (AI) -----------------------------------------------------------
+
+def _shared_text(request):
+    """Text arriving from Android's Share menu (?title=&text=&url=) or a plain ?text=."""
+    parts = [request.GET.get(k, "").strip() for k in ("title", "text", "url")]
+    seen, out = set(), []
+    for p in parts:
+        if p and p not in seen:
+            seen.add(p)
+            out.append(p)
+    return "\n".join(out)
+
+
+def _guess_kind(text):
+    t = text.lower()
+    if re.search(r"^\[?\d{1,2}[/.]\d{1,2}[/.]\d{2,4},? \d{1,2}:\d{2}", text, re.M) or "whatsapp" in t:
+        return "whatsapp"
+    if re.search(r"^(from|subject|to|sent):", t, re.M) or "dear " in t or "regards" in t:
+        return "email"
+    if "minutes" in t or "attendees" in t or "agenda" in t:
+        return "meeting"
+    return "note"
+
+
+def capture(request):
+    workspace = _selected_workspace(request) or Workspace.objects.filter(archived=False).first()
+    if not workspace:
+        messages.info(request, "Create a workspace first.")
+        return redirect("workspace_create")
+    form = CaptureForm(request.POST or None, initial={"text": _shared_text(request), "workspace": workspace})
+    ai_ready = ai.is_configured()
+    if request.method == "POST" and form.is_valid():
+        ws = form.cleaned_data["workspace"]
+        text = form.cleaned_data["text"]
+        initial = {"workspace": ws, "body": text, "kind": _guess_kind(text), "action": "new_task",
+                   "my_role": "following"}
+        info = {}
+        if "use_ai" in request.POST:
+            try:
+                suggestion, info = ai.suggest_for_capture(ws, text)
+            except ai.AIError as exc:
+                messages.error(request, str(exc))
+                suggestion = None
+            if suggestion:
+                initial.update({
+                    "summary": suggestion["summary"], "kind": suggestion["message_kind"],
+                    "source": suggestion["sender"], "action": suggestion["action"],
+                    "task": suggestion["task_id"], "new_task_title": suggestion["new_task_title"],
+                    "desk": suggestion["desk"], "next_action": suggestion["next_action"],
+                    "due_date": suggestion["due_date"], "follow_up_date": suggestion["follow_up_date"],
+                    "event_title": suggestion["event_title"], "event_start": suggestion["event_start"],
+                    "event_end": suggestion["event_end"], "event_location": suggestion["event_location"],
+                    "event_my_role": suggestion["event_my_role"] or "guest",
+                    "event_kind": suggestion["event_kind"] or "meeting",
+                    "handoff": bool(suggestion["desk"]),
+                })
+                info["used_ai"] = True
+        review = CaptureReviewForm(initial=initial, workspace=ws)
+        return render(request, "tracker/capture_review.html",
+                      {"form": review, "workspace": ws, "info": info, "text": text})
+    return render(request, "tracker/capture.html", {"form": form, "ai_ready": ai_ready,
+                                                     "ai_off_workspaces": Workspace.objects.filter(ai_enabled=False)})
+
+
+@require_POST
+def capture_save(request):
+    ws = get_object_or_404(Workspace, pk=request.POST.get("workspace"))
+    form = CaptureReviewForm(request.POST, workspace=ws)
+    if not form.is_valid():
+        return render(request, "tracker/capture_review.html",
+                      {"form": form, "workspace": ws, "info": {}, "text": request.POST.get("body", "")},
+                      status=400)
+    d = form.cleaned_data
+    holder, contact = d.get("desk") or (None, None)
+    action = d["action"]
+
+    if action == "new_event":
+        event = Event.objects.create(
+            workspace=ws, title=d["event_title"].strip(), kind=d.get("event_kind") or "meeting",
+            my_role=d.get("event_my_role") or "guest", status="invited", start=d["event_start"],
+            end=d.get("event_end"), location=d.get("event_location", ""), organizer=holder,
+            organizer_contact=contact, organizer_other="" if holder else d.get("source", ""),
+            description="\n\n".join(x for x in [d.get("summary", ""), d.get("body", "")] if x),
+            preparation=d.get("next_action", ""),
+        )
+        messages.success(request, "Event added. Mark it Confirmed or Declined when you've answered.")
+        return redirect(event)
+
+    with transaction.atomic():
+        if action == "new_task":
+            with_me = d.get("my_role") == "executing"
+            task = Task.objects.create(
+                workspace=ws, title=d["new_task_title"].strip(), my_role=d.get("my_role") or "following",
+                stage=ws.first_open_stage() or ws.stages.first(),
+                current_holder=None if with_me else holder, current_contact=None if with_me else contact,
+                due_date=d.get("due_date"),
+            )
+            services.record_created(task)
+        else:
+            task = d["task"]
+            if d.get("handoff") and holder and (holder, contact) != (task.current_holder, task.current_contact):
+                services.hand_off(task, holder, "", to_contact=contact)
+            if d.get("due_date") and not task.due_date:
+                task.due_date = d["due_date"]
+                task.save(update_fields=["due_date", "updated_at"])
+        Update.objects.create(task=task, kind=d["kind"], body=d.get("body", ""), summary=d.get("summary", ""),
+                              source=d.get("source", ""))
+        if d.get("follow_up_date"):
+            services.set_follow_up(task, d["follow_up_date"], d.get("next_action", ""))
+        services.touch(task)
+    messages.success(request, "Saved to the task's timeline." if action == "update_task" else "Task registered.")
+    return redirect(task)
+
+
+@require_POST
+def update_summarize(request, pk):
+    update = get_object_or_404(Update.objects.select_related("task__workspace"), pk=pk)
+    try:
+        update.summary = ai.summarize(update.body, update.task.workspace)
+        update.save(update_fields=["summary"])
+        messages.success(request, "Summary added.")
+    except ai.AIError as exc:
+        messages.error(request, str(exc))
+    return redirect(update.task)
+
+
+def settings_view(request):
+    s = AppSettings.load()
+    form = SettingsForm(request.POST or None, initial={"ai_model": s.ai_model})
+    if request.method == "POST" and "test" in request.POST:
+        try:
+            ai.test_connection()
+            messages.success(request, "Connected — the AI key works.")
+        except ai.AIError as exc:
+            messages.error(request, str(exc))
+        return redirect("settings")
+    if request.method == "POST" and form.is_valid():
+        if form.cleaned_data["remove_key"]:
+            ai.save_api_key("")
+            messages.success(request, "API key removed.")
+        elif form.cleaned_data["api_key"]:
+            ai.save_api_key(form.cleaned_data["api_key"])
+            messages.success(request, "API key saved (encrypted). Use “Test the key” to check it.")
+        s = AppSettings.load()
+        s.ai_model = form.cleaned_data["ai_model"]
+        s.save(update_fields=["ai_model", "updated_at"])
+        return redirect("settings")
+    return render(request, "tracker/settings.html", {
+        "form": form, "s": s, "usage": ai.usage_this_month(),
+        "workspaces": Workspace.objects.all(),
+        "recent_errors": AIUsage.objects.filter(ok=False)[:5],
+    })
+
+
+# --- Installable app (PWA) --------------------------------------------------------
+
+@login_not_required
+def manifest(request):
+    icons = static("tracker/icons/")
+    data = {
+        "name": "Task Manager",
+        "short_name": "Tasks",
+        "id": "/",
+        "start_url": "/?source=app",
+        "scope": "/",
+        "display": "standalone",
+        "background_color": "#f4f6f9",
+        "theme_color": "#1f3a5f",
+        "description": "Track tasks, hand-offs and events.",
+        "icons": [
+            {"src": icons + "icon-192.png", "sizes": "192x192", "type": "image/png"},
+            {"src": icons + "icon-512.png", "sizes": "512x512", "type": "image/png"},
+            {"src": icons + "maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+        ],
+        "share_target": {
+            "action": "/capture/",
+            "method": "GET",
+            "enctype": "application/x-www-form-urlencoded",
+            "params": {"title": "title", "text": "text", "url": "url"},
+        },
+        "shortcuts": [
+            {"name": "Quick capture", "url": "/capture/", "icons": [{"src": icons + "icon-192.png", "sizes": "192x192"}]},
+            {"name": "New task", "url": "/tasks/new/", "icons": [{"src": icons + "icon-192.png", "sizes": "192x192"}]},
+        ],
+    }
+    resp = JsonResponse(data, json_dumps_params={"indent": 1})
+    resp["Content-Type"] = "application/manifest+json"
+    return resp
+
+
+SERVICE_WORKER = """
+const CACHE = "tm-v1";
+const OFFLINE = "/offline/";
+self.addEventListener("install", (e) => {
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll([OFFLINE])).then(() => self.skipWaiting()));
+});
+self.addEventListener("activate", (e) => {
+  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+    .then(() => self.clients.claim()));
+});
+self.addEventListener("fetch", (e) => {
+  const req = e.request;
+  if (req.method !== "GET") return;
+  const url = new URL(req.url);
+  if (url.origin !== location.origin) return;
+  if (url.pathname.startsWith("/static/")) {
+    // Static files: cache first, refresh in the background.
+    e.respondWith(caches.open(CACHE).then(async (c) => {
+      const hit = await c.match(req);
+      const net = fetch(req).then((r) => { if (r.ok) c.put(req, r.clone()); return r; }).catch(() => hit);
+      return hit || net;
+    }));
+    return;
+  }
+  if (req.mode === "navigate") {
+    // Pages are always fetched fresh (they hold your data); offline page if there's no connection.
+    e.respondWith(fetch(req).catch(() => caches.match(OFFLINE)));
+  }
+});
+"""
+
+
+@login_not_required
+def service_worker(request):
+    resp = HttpResponse(SERVICE_WORKER, content_type="application/javascript")
+    resp["Cache-Control"] = "no-cache"
+    resp["Service-Worker-Allowed"] = "/"
+    return resp
+
+
+@login_not_required
+def offline(request):
+    return render(request, "tracker/offline.html")

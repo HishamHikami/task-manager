@@ -513,7 +513,13 @@ class EventTests(BaseCase):
 
     def test_outside_organizer_text(self):
         self.post_event(organizer_other="City Cultural Club")
-        self.assertEqual(Event.objects.get().organizer_name, "City Cultural Club")
+        event = Event.objects.get()
+        self.assertEqual(event.organizer_name, "City Cultural Club")
+        self.assertContains(self.client.get(event.get_absolute_url()), "City Cultural Club")
+
+    def test_event_without_organizer_page_opens(self):
+        self.post_event()
+        self.assertEqual(self.client.get(Event.objects.get().get_absolute_url()).status_code, 200)
 
     def test_end_before_start_rejected(self):
         start = timezone.localtime() + timedelta(days=1)
@@ -554,3 +560,218 @@ class EventTests(BaseCase):
         self.assertIn("SUMMARY:Talk\\, with commas\; and semicolons", body)
         self.assertIn("My role: Speaker / Lecturer", body)
         self.assertIn("STATUS:TENTATIVE", body)
+
+
+# --- AI & phone app -----------------------------------------------------------------
+
+from types import SimpleNamespace
+from unittest import mock
+
+from . import ai
+from .models import AIUsage, AppSettings, Update
+
+
+class FakeAnthropic:
+    """Stands in for anthropic.Anthropic: returns a canned parsed result."""
+
+    result = None
+    stop_reason = "end_turn"
+    calls = []
+
+    def __init__(self, **kwargs):
+        self.messages = self
+
+    def parse(self, **kwargs):
+        FakeAnthropic.calls.append(kwargs)
+        parsed = kwargs["output_format"](**FakeAnthropic.result)
+        return SimpleNamespace(parsed_output=parsed, stop_reason=FakeAnthropic.stop_reason,
+                               usage=SimpleNamespace(input_tokens=900, output_tokens=120))
+
+
+def suggestion(**over):
+    data = {"summary": "Finance approved the budget; needs GM signature.", "message_kind": "email",
+            "sender": "Sara", "action": "new_task", "task_id": None, "new_task_title": "", "desk": None,
+            "next_action": "", "due_date": None, "follow_up_date": None, "event_title": "",
+            "event_start": None, "event_end": None, "event_location": "", "event_my_role": None,
+            "event_kind": None}
+    data.update(over)
+    return data
+
+
+class AIBase(BaseCase):
+    def setUp(self):
+        super().setUp()
+        ai.save_api_key("sk-ant-test-0000000000000000000000000000abcd")
+        FakeAnthropic.calls = []
+        FakeAnthropic.stop_reason = "end_turn"
+        patcher = mock.patch("anthropic.Anthropic", FakeAnthropic)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+
+class AIKeyTests(BaseCase):
+    def test_key_encrypted_and_only_hint_shown(self):
+        raw = "sk-ant-test-1111111111111111111111111111wxyz"
+        resp = self.client.post(reverse("settings"), {"api_key": raw, "ai_model": "claude-haiku-5-5"})
+        self.assertRedirects(resp, reverse("settings"))
+        s = AppSettings.load()
+        self.assertNotIn(raw, s.anthropic_key_encrypted)
+        self.assertEqual(ai.decrypt_key(s.anthropic_key_encrypted), raw)
+        page = self.client.get(reverse("settings")).content.decode()
+        self.assertIn("…wxyz", page)
+        self.assertNotIn(raw, page)
+
+    def test_invalid_key_rejected(self):
+        self.client.post(reverse("settings"), {"api_key": "hello", "ai_model": "claude-haiku-5-5"})
+        self.assertFalse(AppSettings.load().has_api_key)
+
+    def test_remove_key(self):
+        ai.save_api_key("sk-ant-test-2222222222222222222222222222abcd")
+        self.client.post(reverse("settings"), {"remove_key": "on", "ai_model": "claude-haiku-5-5"})
+        self.assertFalse(AppSettings.load().has_api_key)
+
+
+class CleanTextTests(TestCase):
+    def test_strips_quoted_reply_and_disclaimer(self):
+        text = ("Dear team,\nThe quotation is approved, please proceed by Thursday.\nRegards,\nSara\n"
+                "Sent from my iPhone\n\nOn Mon, 23 Nov 2026 at 10:00, Ali <ali@x.com> wrote:\n> old stuff\n> more\n")
+        cleaned, short = ai.clean_text(text)
+        self.assertIn("approved", cleaned)
+        self.assertNotIn("old stuff", cleaned)
+        self.assertNotIn("Sent from my", cleaned)
+        self.assertFalse(short)
+        cleaned, _ = ai.clean_text("Hello there, the report is ready for review today.\n\n"
+                                   "DISCLAIMER: This email is confidential ...")
+        self.assertNotIn("DISCLAIMER", cleaned)
+
+    def test_long_text_shortened(self):
+        _, short = ai.clean_text("word " * 5000)
+        self.assertTrue(short)
+
+
+class CaptureTests(AIBase):
+    def test_share_target_prefills_text(self):
+        page = self.client.get(reverse("capture"), {"title": "Fwd: Budget", "text": "Please approve"})
+        self.assertContains(page, "Fwd: Budget\nPlease approve")
+
+    def test_ai_suggestion_prefills_review(self):
+        task = self.make_task()
+        sara = Contact.objects.create(holder=self.gm, name="Sara", role="Secretary")
+        FakeAnthropic.result = suggestion(action="update_task", task_id=task.pk, desk=f"c{sara.pk}",
+                                          follow_up_date="2026-12-01", next_action="Check signature")
+        page = self.client.post(reverse("capture"), {"text": "Budget approved, sent to GM office",
+                                                      "workspace": self.ws.pk, "use_ai": "1"})
+        self.assertContains(page, "Suggested by AI")
+        self.assertContains(page, "Finance approved the budget")
+        self.assertContains(page, f'<option value="c{sara.pk}" selected>')
+        call = FakeAnthropic.calls[0]
+        self.assertEqual(call["model"], "claude-haiku-5-5")
+        self.assertEqual(call["output_config"], {"effort": "low"})
+        self.assertIn(f"c{sara.pk}: Sara - Secretary (GM Office)", call["messages"][0]["content"])
+        self.assertEqual(AIUsage.objects.get().input_tokens, 900)
+
+    def test_same_text_reuses_result(self):
+        FakeAnthropic.result = suggestion()
+        for _ in range(2):
+            self.client.post(reverse("capture"), {"text": "Same message", "workspace": self.ws.pk, "use_ai": "1"})
+        self.assertEqual(len(FakeAnthropic.calls), 1)
+
+    def test_made_up_ids_are_dropped(self):
+        FakeAnthropic.result = suggestion(action="update_task", task_id=9999, desk="c9999",
+                                          due_date="not a date")
+        result, _ = ai.suggest_for_capture(self.ws, "Something")
+        self.assertEqual((result["task_id"], result["desk"], result["due_date"], result["action"]),
+                         (None, None, None, "new_task"))
+
+    def test_ai_off_for_workspace_sends_nothing(self):
+        self.ws.ai_enabled = False
+        self.ws.save()
+        page = self.client.post(reverse("capture"), {"text": "Secret", "workspace": self.ws.pk, "use_ai": "1"},
+                                follow=True)
+        self.assertContains(page, "AI is turned off for Company")
+        self.assertEqual(FakeAnthropic.calls, [])
+
+    def test_refusal_reported(self):
+        FakeAnthropic.result = suggestion()
+        FakeAnthropic.stop_reason = "refusal"
+        with self.assertRaises(ai.AIError):
+            ai.suggest_for_capture(self.ws, "Text")
+
+    def test_save_update_with_handoff_and_follow_up(self):
+        task = self.make_task()
+        sara = Contact.objects.create(holder=self.gm, name="Sara")
+        resp = self.client.post(reverse("capture_save"), {
+            "workspace": self.ws.pk, "body": "Full email text", "summary": "Approved; with GM",
+            "kind": "email", "source": "Sara", "action": "update_task", "task": task.pk,
+            "desk": f"c{sara.pk}", "handoff": "on", "next_action": "Ask about signature",
+            "follow_up_date": "2026-12-01"})
+        self.assertRedirects(resp, task.get_absolute_url())
+        task.refresh_from_db()
+        self.assertEqual((task.current_holder, task.current_contact), (self.gm, sara))
+        self.assertEqual(str(task.follow_up_date), "2026-12-01")
+        u = task.updates.get(kind="email")
+        self.assertEqual((u.body, u.summary, u.source), ("Full email text", "Approved; with GM", "Sara"))
+
+    def test_save_new_task_without_ai(self):
+        page = self.client.post(reverse("capture"), {"text": "Please renew the license", "workspace": self.ws.pk,
+                                                      "manual": "1"})
+        self.assertContains(page, "Check and save")
+        self.assertEqual(FakeAnthropic.calls, [])
+        self.client.post(reverse("capture_save"), {
+            "workspace": self.ws.pk, "body": "Please renew the license", "kind": "whatsapp",
+            "action": "new_task", "new_task_title": "Renew license", "my_role": "executing"})
+        task = Task.objects.get(title="Renew license")
+        self.assertTrue(task.with_me)
+        self.assertEqual(task.updates.get(kind="whatsapp").body, "Please renew the license")
+
+    def test_save_as_event(self):
+        resp = self.client.post(reverse("capture_save"), {
+            "workspace": self.ws.pk, "body": "You are invited to speak at our forum", "summary": "Invite to speak",
+            "kind": "email", "source": "City Club", "action": "new_event", "event_title": "Youth forum",
+            "event_kind": "conference", "event_my_role": "speaker", "event_start": "2026-12-10T18:00",
+            "event_location": "Hall A"})
+        event = Event.objects.get()
+        self.assertRedirects(resp, event.get_absolute_url())
+        self.assertEqual((event.status, event.my_role, event.organizer_name), ("invited", "speaker", "City Club"))
+
+    def test_review_requires_task_for_update(self):
+        resp = self.client.post(reverse("capture_save"), {
+            "workspace": self.ws.pk, "body": "x", "kind": "note", "action": "update_task"})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_summarize_existing_update(self):
+        task = self.make_task()
+        u = Update.objects.create(task=task, kind="email", body="Long email about the budget")
+        FakeAnthropic.result = {"summary": "Budget approved."}
+        page = self.client.get(task.get_absolute_url())
+        self.assertContains(page, "✨ Summarize")
+        self.client.post(reverse("update_summarize", args=[u.pk]))
+        u.refresh_from_db()
+        self.assertEqual(u.summary, "Budget approved.")
+
+    def test_usage_estimate(self):
+        AIUsage.objects.create(purpose="capture", model="claude-haiku-5-5", input_tokens=1_000_000,
+                               output_tokens=100_000)
+        self.assertAlmostEqual(ai.usage_this_month()["cost"], 0.15)
+
+
+class PWATests(TestCase):
+    def test_manifest_and_share_target_public(self):
+        resp = self.client.get("/manifest.webmanifest")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/manifest+json")
+        data = resp.json()
+        self.assertEqual(data["display"], "standalone")
+        self.assertEqual(data["share_target"]["action"], "/capture/")
+        self.assertEqual({i["sizes"] for i in data["icons"]}, {"192x192", "512x512"})
+
+    def test_service_worker_and_offline_public(self):
+        sw = self.client.get("/sw.js")
+        self.assertEqual(sw.status_code, 200)
+        self.assertEqual(sw["Service-Worker-Allowed"], "/")
+        self.assertEqual(self.client.get("/offline/").status_code, 200)
+
+    def test_share_requires_login_then_returns(self):
+        resp = self.client.get("/capture/?text=hello")
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("/login/?next=/capture/%3Ftext%3Dhello", resp["Location"])

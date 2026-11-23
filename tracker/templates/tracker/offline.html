@@ -1,0 +1,9 @@
+{% extends "tracker/base.html" %}
+{% block title %}Offline{% endblock %}
+{% block content %}
+<div class="card narrow empty">
+  <h1>You're offline</h1>
+  <p class="muted">Task Manager needs a connection to show your tasks. Check your internet and try again.</p>
+  <button class="btn btn-primary" type="button" onclick="location.reload()">Try again</button>
+</div>
+{% endblock %}
