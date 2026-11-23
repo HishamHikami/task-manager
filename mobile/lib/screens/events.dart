@@ -493,23 +493,16 @@ class _EventFormScreenState extends State<EventFormScreen> {
     final app = AppScope.of(context);
     final b = Theme.of(context).brightness;
     const gap = SizedBox(height: 14);
-    DropdownButtonFormField<String> dd(
+    Widget dd(
       String label,
       String value,
       String key,
       ValueChanged<String> on,
-    ) => DropdownButtonFormField<String>(
-      initialValue: value,
-      isExpanded: true,
-      decoration: InputDecoration(labelText: label),
-      items: [
-        for (final o in app.option(key))
-          DropdownMenuItem(
-            value: o['value'] as String,
-            child: Text(o['label'] as String, overflow: TextOverflow.ellipsis),
-          ),
-      ],
-      onChanged: (v) => on(v!),
+    ) => PickerField<String>(
+      label: label,
+      value: value,
+      groups: simpleGroups<String>(app.option(key)),
+      onChanged: (v) => on(v ?? value),
     );
     return Scaffold(
       appBar: AppBar(

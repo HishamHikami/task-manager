@@ -4,6 +4,9 @@ import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'api.dart';
+import 'picker.dart';
+
+export 'picker.dart';
 import 'state.dart';
 
 // ---------------------------------------------------------------- colors & text
@@ -651,7 +654,8 @@ class ContactActions extends StatelessWidget {
 
 // ---------------------------------------------------------------- form fields
 
-/// Grouped picker for "who has it": departments with their people, plus individuals.
+/// Picker for "who has it": each department with a "whole department" choice
+/// and its people (initials, role, ★ main contact), plus individuals.
 class DeskPicker extends StatelessWidget {
   const DeskPicker({
     super.key,
@@ -667,54 +671,85 @@ class DeskPicker extends StatelessWidget {
   final String label;
   final bool allowNone;
 
+  static PickOption<String?> _option(Json o, String group) {
+    final value = o['value'] as String;
+    final raw = o['label'] as String;
+    if (raw.contains('— whole')) {
+      final kind = raw.split('— whole').last.trim();
+      return PickOption(
+        value,
+        'Whole $kind',
+        subtitle: group,
+        icon: Icons.groups_2_outlined,
+      );
+    }
+    final primary = raw.endsWith('★');
+    final clean = raw.replaceAll('★', '').trim();
+    final parts = clean.split(' · ');
+    final name = parts.first;
+    final role = parts.length > 1 ? parts.sublist(1).join(' · ') : '';
+    final sub = [
+      if (role.isNotEmpty) role,
+      if (primary) '★ Main contact',
+    ].join('  ·  ');
+    return PickOption(
+      value,
+      name,
+      subtitle: sub.isEmpty ? null : sub,
+      leading: Initials(name),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final items = <DropdownMenuItem<String?>>[];
-    if (allowNone) {
-      items.add(
-        const DropdownMenuItem(value: null, child: Text('— Nobody / not sure')),
-      );
-    }
-    final values = <String>{};
-    for (final g in groups) {
-      items.add(
-        DropdownMenuItem(
-          enabled: false,
-          value: '__${g['label']}',
-          child: Text(
-            (g['label'] as String).toUpperCase(),
-            style: TextStyle(
-              fontSize: 11.5,
-              letterSpacing: .6,
-              fontWeight: FontWeight.w700,
-              color: cs.primary,
-            ),
+    final picks = <PickGroup<String?>>[
+      if (allowNone)
+        const PickGroup([
+          PickOption<String?>(
+            null,
+            'Nobody / not sure',
+            icon: Icons.remove_circle_outline,
           ),
-        ),
-      );
-      for (final o in (g['options'] as List).cast<Json>()) {
-        values.add(o['value'] as String);
-        final whole = (o['label'] as String).contains('— whole');
-        items.add(
-          DropdownMenuItem(
-            value: o['value'] as String,
-            child: Padding(
-              padding: EdgeInsets.only(left: whole ? 0 : 12),
-              child: Text(
-                o['label'] as String,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ),
-        );
+        ]),
+      for (final g in groups)
+        PickGroup([
+          for (final o in (g['options'] as List).cast<Json>())
+            _option(o, g['label'] as String),
+        ], title: g['label'] as String),
+    ];
+    // Show "Department · Person" in the field so it's clear which desk it is.
+    String? deptOf(String? v) {
+      for (final g in groups) {
+        for (final o in (g['options'] as List).cast<Json>()) {
+          if (o['value'] == v) return g['label'] as String;
+        }
       }
+      return null;
     }
-    return DropdownButtonFormField<String?>(
-      initialValue: values.contains(value) ? value : null,
-      isExpanded: true,
-      decoration: InputDecoration(labelText: label),
-      items: items,
+
+    final count = groups.fold<int>(
+      0,
+      (n, g) => n + (g['options'] as List).length,
+    );
+    return PickerField<String?>(
+      label: label,
+      groups: [
+        for (final g in picks)
+          PickGroup([
+            for (final o in g.options)
+              (o.value != null && o.value == value && o.icon == null)
+                  ? PickOption<String?>(
+                      o.value,
+                      o.label,
+                      subtitle: deptOf(o.value),
+                      leading: o.leading,
+                    )
+                  : o,
+          ], title: g.title),
+      ],
+      value: value,
+      placeholder: allowNone ? 'Nobody / not sure' : 'Choose…',
+      searchable: count > 8,
       onChanged: onChanged,
     );
   }

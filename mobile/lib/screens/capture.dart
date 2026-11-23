@@ -220,27 +220,32 @@ class _CaptureScreenState extends State<CaptureScreen> {
                         child: Row(
                           children: [
                             Flexible(
-                              child: PopupMenuButton<int>(
-                                tooltip: 'Workspace',
-                                onSelected: (v) => setState(() => _ws = v),
-                                itemBuilder: (_) => [
-                                  for (final w in app.workspaces)
-                                    PopupMenuItem(
-                                      value: w['id'] as int,
-                                      child: Row(
-                                        children: [
-                                          Dot(
-                                            workspaceColor(
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(99),
+                                onTap: () async {
+                                  final r = await showPicker<int>(
+                                    context,
+                                    title: 'Workspace',
+                                    selected: _ws,
+                                    groups: [
+                                      PickGroup([
+                                        for (final w in app.workspaces)
+                                          PickOption(
+                                            w['id'] as int,
+                                            w['name'] as String,
+                                            color: workspaceColor(
                                               w['color'] as String?,
                                               b,
                                             ),
+                                            subtitle: w['ai_enabled'] == true
+                                                ? null
+                                                : 'AI off',
                                           ),
-                                          const SizedBox(width: 8),
-                                          Text(w['name'] as String),
-                                        ],
-                                      ),
-                                    ),
-                                ],
+                                      ]),
+                                    ],
+                                  );
+                                  if (r != null) setState(() => _ws = r.value);
+                                },
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 12,
@@ -690,21 +695,24 @@ class _ReplyCardState extends State<_ReplyCard> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (_action == 'update_task') ...[
-                  DropdownButtonFormField<int>(
-                    initialValue: tasks.any((t) => t['id'] == _task)
-                        ? _task
-                        : null,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Task'),
-                    items: [
-                      for (final t in tasks)
-                        DropdownMenuItem(
-                          value: t['id'] as int,
-                          child: Text(
-                            '${t['title']}${(t['desk'] as String).isNotEmpty ? ' — ${t['desk']}' : ''}',
-                            overflow: TextOverflow.ellipsis,
+                  PickerField<int>(
+                    label: 'Task',
+                    sheetTitle: 'Which task?',
+                    value: tasks.any((t) => t['id'] == _task) ? _task : null,
+                    placeholder: 'Choose the task',
+                    searchable: tasks.length > 6,
+                    groups: [
+                      PickGroup([
+                        for (final t in tasks)
+                          PickOption(
+                            t['id'] as int,
+                            t['title'] as String,
+                            subtitle: (t['desk'] as String).isEmpty
+                                ? null
+                                : 'With ${t['desk']}',
+                            icon: Icons.task_alt,
                           ),
-                        ),
+                      ]),
                     ],
                     onChanged: (v) => setState(() => _task = v),
                   ),
@@ -794,18 +802,11 @@ class _ReplyCardState extends State<_ReplyCard> {
                     decoration: const InputDecoration(labelText: 'Where'),
                   ),
                   gap,
-                  DropdownButtonFormField<String>(
-                    initialValue: _eventRole,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'My role'),
-                    items: [
-                      for (final o in app.option('event_roles'))
-                        DropdownMenuItem(
-                          value: o['value'] as String,
-                          child: Text(o['label'] as String),
-                        ),
-                    ],
-                    onChanged: (v) => setState(() => _eventRole = v!),
+                  PickerField<String>(
+                    label: 'My role',
+                    value: _eventRole,
+                    groups: simpleGroups<String>(app.option('event_roles')),
+                    onChanged: (v) => setState(() => _eventRole = v ?? 'guest'),
                   ),
                 ],
               ],

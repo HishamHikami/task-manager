@@ -382,22 +382,25 @@ Future<String?> openAddHolder(BuildContext context, int workspaceId) async {
             ),
             if (isPerson && groups.isNotEmpty) ...[
               const SizedBox(height: 12),
-              DropdownButtonFormField<int?>(
-                initialValue: department,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Department (optional)',
-                ),
-                items: [
-                  const DropdownMenuItem(
-                    value: null,
-                    child: Text('— Works on their own'),
-                  ),
-                  for (final g in groups)
-                    DropdownMenuItem(
-                      value: g['id'] as int,
-                      child: Text(g['name'] as String),
+              PickerField<int?>(
+                label: 'Department (optional)',
+                value: department,
+                placeholder: 'Works on their own',
+                groups: [
+                  PickGroup([
+                    const PickOption<int?>(
+                      null,
+                      'Works on their own',
+                      icon: Icons.person_outline,
                     ),
+                    for (final g in groups)
+                      PickOption<int?>(
+                        g['id'] as int,
+                        g['name'] as String,
+                        subtitle: g['kind_label'] as String?,
+                        icon: Icons.groups_2_outlined,
+                      ),
+                  ]),
                 ],
                 onChanged: (v) => set(() => department = v),
               ),

@@ -186,24 +186,32 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         ),
         actions: [
           if (t != null)
-            PopupMenuButton<String>(
-              onSelected: (v) => v == 'edit' ? _edit(t) : _delete(t),
-              itemBuilder: (_) => const [
-                PopupMenuItem(
-                  value: 'edit',
-                  child: ListTile(
-                    leading: Icon(Icons.edit_outlined),
-                    title: Text('Edit'),
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'delete',
-                  child: ListTile(
-                    leading: Icon(Icons.delete_outline),
-                    title: Text('Delete'),
-                  ),
-                ),
-              ],
+            IconButton(
+              tooltip: 'More',
+              icon: const Icon(Icons.more_vert),
+              onPressed: () async {
+                final v = await showActions(
+                  context,
+                  title: t['title'] as String,
+                  actions: const [
+                    PickOption(
+                      'edit',
+                      'Edit task',
+                      subtitle: 'Title, dates, priority, role',
+                      icon: Icons.edit_outlined,
+                    ),
+                    PickOption(
+                      'delete',
+                      'Delete task',
+                      subtitle: 'Removes its whole timeline',
+                      icon: Icons.delete_outline,
+                      danger: true,
+                    ),
+                  ],
+                );
+                if (v == 'edit') _edit(t);
+                if (v == 'delete') _delete(t);
+              },
             ),
         ],
       ),
@@ -1153,15 +1161,23 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                       ],
                     ),
             ),
-          DropdownButtonFormField<int>(
-            initialValue: _priority,
-            decoration: const InputDecoration(labelText: 'Priority'),
-            items: [
-              for (final p in app.option('priorities'))
-                DropdownMenuItem(
-                  value: p['value'] as int,
-                  child: Text(p['label'] as String),
-                ),
+          PickerField<int>(
+            label: 'Priority',
+            value: _priority,
+            groups: [
+              PickGroup([
+                for (final p in app.option('priorities'))
+                  PickOption(
+                    p['value'] as int,
+                    p['label'] as String,
+                    icon: const [
+                      Icons.south_rounded,
+                      Icons.remove_rounded,
+                      Icons.north_rounded,
+                      Icons.priority_high_rounded,
+                    ][(p['value'] as int) - 1],
+                  ),
+              ]),
             ],
             onChanged: (v) => setState(() => _priority = v ?? 2),
           ),
