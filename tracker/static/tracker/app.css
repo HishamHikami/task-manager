@@ -185,7 +185,7 @@ h3 { font-size: 1rem; margin: 0 0 .5rem; }
 .field label { font-weight: 600; font-size: .9rem; }
 .field-check label { font-weight: 400; display: flex; gap: 8px; align-items: center; }
 .req { color: var(--red); }
-input[type=text], input[type=search], input[type=password], input[type=email], input[type=number],
+input[type=text], input[type=search], input[type=password], input[type=email], input[type=number], input[type=tel], input[type=url],
 input[type=date], input[type=datetime-local], select, textarea {
   width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
   background: var(--surface); color: var(--text); font: inherit;
@@ -229,3 +229,5 @@ table.list form { margin: 0; }
   h1 { font-size: 1.25rem; }
 }
 .field[hidden] { display: none; }
+.contactlinks { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px; font-size: .9rem; }
+.contactlinks a { word-break: break-all; }

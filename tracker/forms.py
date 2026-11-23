@@ -45,12 +45,19 @@ class StageForm(forms.ModelForm):
 class HolderForm(forms.ModelForm):
     class Meta:
         model = Holder
-        fields = ["name", "kind", "contact_person", "contact", "notes", "active"]
-        widgets = {"notes": forms.Textarea(attrs={"rows": 2})}
+        fields = ["name", "kind", "contact_person", "phone", "email", "notes", "active"]
+        widgets = {
+            "notes": forms.Textarea(attrs={"rows": 2}),
+            "phone": forms.TextInput(attrs={"type": "tel", "autocomplete": "tel", "inputmode": "tel"}),
+            "email": forms.EmailInput(attrs={"autocomplete": "email"}),
+        }
 
     def __init__(self, *args, workspace=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.workspace = workspace or self.instance.workspace
+
+    def clean_phone(self):
+        return " ".join(self.cleaned_data["phone"].split())
 
     def clean_name(self):
         name = self.cleaned_data["name"].strip()

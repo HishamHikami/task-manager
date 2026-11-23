@@ -169,3 +169,35 @@ class ContactPersonTests(BaseCase):
                          {"name": "Events Committee", "kind": "committee", "contact_person": "Br. Ali",
                           "active": "on"})
         self.assertEqual(Holder.objects.get(name="Events Committee").contact_person, "Br. Ali")
+
+
+class PhoneEmailTests(BaseCase):
+    def post_holder(self, **data):
+        base = {"name": "Legal", "kind": "department", "active": "on"}
+        base.update(data)
+        return self.client.post(reverse("holder_create", args=[self.ws.pk]), base)
+
+    def test_saves_phone_and_email_separately(self):
+        self.post_holder(phone="+966  50 123 4567", email="khalid@example.com")
+        h = Holder.objects.get(name="Legal")
+        self.assertEqual(h.phone, "+966 50 123 4567")
+        self.assertEqual(h.email, "khalid@example.com")
+        self.assertEqual(h.phone_link, "+966501234567")
+
+    def test_extension_allowed(self):
+        self.post_holder(phone="ext 214")
+        self.assertEqual(Holder.objects.get(name="Legal").phone, "ext 214")
+
+    def test_invalid_values_rejected(self):
+        resp = self.post_holder(phone="call Sara", email="not-an-email")
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(Holder.objects.filter(name="Legal").exists())
+        self.assertContains(resp, "Enter a valid email address.")
+
+    def test_task_page_shows_tap_to_call_and_email(self):
+        self.finance.phone = "+966 11 222 3333"
+        self.finance.email = "finance@example.com"
+        self.finance.save()
+        resp = self.client.get(self.make_task().get_absolute_url())
+        self.assertContains(resp, 'href="tel:+966112223333"')
+        self.assertContains(resp, 'href="mailto:finance@example.com"')

@@ -1,3 +1,4 @@
+from django.core.validators import RegexValidator
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -97,9 +98,16 @@ class Holder(models.Model):
         blank=True,
         help_text="The person you deal with there, e.g. the department head or committee lead.",
     )
-    contact = models.CharField(
-        "Phone / email", max_length=200, blank=True, help_text="Phone, email or extension."
+    phone = models.CharField(
+        max_length=40,
+        blank=True,
+        validators=[
+            RegexValidator(r"^[0-9+()\-\s.]*(?:\s*(?:ext\.?|x)\s*[0-9]+)?$",
+                           "Use digits, spaces, + ( ) - and optionally 'ext 123'.")
+        ],
+        help_text="Mobile, landline or extension, e.g. +966 50 123 4567 or ext 214.",
     )
+    email = models.EmailField(blank=True)
     notes = models.TextField(blank=True)
     active = models.BooleanField(default=True)
 
@@ -115,6 +123,13 @@ class Holder(models.Model):
     @property
     def is_group(self):
         return self.kind in self.GROUP_KINDS
+
+    @property
+    def phone_link(self):
+        """Phone number in a form usable for a tel: link (digits and leading +)."""
+        main = self.phone.lower().split("ext")[0].split("x")[0]
+        digits = "".join(ch for ch in main if ch.isdigit() or ch == "+")
+        return digits
 
     @property
     def display_name(self):
