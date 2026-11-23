@@ -3,6 +3,19 @@ from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 
+PHONE_VALIDATOR = RegexValidator(
+    r"^[0-9+()\-\s.]*(?:\s*(?:ext\.?|x)\s*[0-9]+)?$",
+    "Use digits, spaces, + ( ) - and optionally 'ext 123'.",
+)
+PHONE_HELP = "Mobile, landline or extension, e.g. +966 50 123 4567 or ext 214."
+
+
+def tel_link(phone):
+    """Phone number in a form usable for a tel: link (digits and leading +)."""
+    main = phone.lower().split("ext")[0].split("x")[0]
+    return "".join(ch for ch in main if ch.isdigit() or ch == "+")
+
+
 DEFAULT_STAGES = [
     ("Registered", False),
     ("Assigned", False),
@@ -92,20 +105,9 @@ class Holder(models.Model):
     GROUP_KINDS = ["department", "committee", "external"]
 
     kind = models.CharField("Type", max_length=12, choices=KIND_CHOICES, default="person")
-    contact_person = models.CharField(
-        "Point of contact",
-        max_length=120,
-        blank=True,
-        help_text="The person you deal with there, e.g. the department head or committee lead.",
-    )
     phone = models.CharField(
-        max_length=40,
-        blank=True,
-        validators=[
-            RegexValidator(r"^[0-9+()\-\s.]*(?:\s*(?:ext\.?|x)\s*[0-9]+)?$",
-                           "Use digits, spaces, + ( ) - and optionally 'ext 123'.")
-        ],
-        help_text="Mobile, landline or extension, e.g. +966 50 123 4567 or ext 214.",
+        max_length=40, blank=True, validators=[PHONE_VALIDATOR],
+        help_text="Main line for the department/committee, or the person's own number.",
     )
     email = models.EmailField(blank=True)
     notes = models.TextField(blank=True)
@@ -126,17 +128,59 @@ class Holder(models.Model):
 
     @property
     def phone_link(self):
-        """Phone number in a form usable for a tel: link (digits and leading +)."""
-        main = self.phone.lower().split("ext")[0].split("x")[0]
-        digits = "".join(ch for ch in main if ch.isdigit() or ch == "+")
-        return digits
+        return tel_link(self.phone)
+
+    def get_absolute_url(self):
+        return reverse("holder_detail", args=[self.pk])
+
+    @property
+    def primary_contact(self):
+        """The main person to deal with in a department/committee (uses prefetched contacts)."""
+        if not self.is_group:
+            return None
+        people = [c for c in self.contacts.all() if c.active]
+        return next((c for c in people if c.is_primary), people[0] if people else None)
 
     @property
     def display_name(self):
-        """"Finance (Sara)" for a group with a point of contact, else just the name."""
-        if self.is_group and self.contact_person:
-            return f"{self.name} ({self.contact_person})"
-        return self.name
+        """"Finance (Sara)" for a group with a main contact, else just the name."""
+        contact = self.primary_contact
+        return f"{self.name} ({contact.name})" if contact else self.name
+
+
+class Contact(models.Model):
+    """A person inside a department, committee or outside party."""
+
+    holder = models.ForeignKey(Holder, on_delete=models.CASCADE, related_name="contacts")
+    name = models.CharField(max_length=120)
+    role = models.CharField(
+        max_length=120, blank=True, help_text="e.g. Manager, Secretary, Accountant, Committee lead."
+    )
+    is_primary = models.BooleanField(
+        "Main contact", default=False, help_text="The person you usually deal with here."
+    )
+    phone = models.CharField(max_length=40, blank=True, validators=[PHONE_VALIDATOR], help_text=PHONE_HELP)
+    email = models.EmailField(blank=True)
+    notes = models.TextField(blank=True)
+    active = models.BooleanField(default=True, help_text="Untick when they leave or change roles.")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-is_primary", "name"]
+
+    def __str__(self):
+        return f"{self.name} — {self.role}" if self.role else self.name
+
+    @property
+    def phone_link(self):
+        return tel_link(self.phone)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.is_primary:
+            Contact.objects.filter(holder=self.holder, is_primary=True).exclude(pk=self.pk).update(
+                is_primary=False
+            )
 
 
 class TaskQuerySet(models.QuerySet):

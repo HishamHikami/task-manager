@@ -231,3 +231,16 @@ table.list form { margin: 0; }
 .field[hidden] { display: none; }
 .contactlinks { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px; font-size: .9rem; }
 .contactlinks a { word-break: break-all; }
+.crumbs { margin: 0 0 4px; font-size: .9rem; }
+.person { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
+.person:first-of-type { border-top: 0; }
+.person.inactive { opacity: .6; }
+.person-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.person-main .role { color: var(--muted); font-size: .9rem; }
+.person-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: .9rem; }
+.person-actions form { margin: 0; }
+.badge-main { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); align-self: flex-start; }
+.people-mini { margin-top: 6px; font-size: .9rem; }
+.people-mini summary { cursor: pointer; color: var(--accent); }
+.people-mini ul { margin: 6px 0; padding-left: 18px; }
+.people-mini li { margin: 2px 0; }

@@ -15,6 +15,7 @@ from django.views.decorators.http import require_POST
 
 from . import services
 from .forms import (
+    ContactForm,
     FollowUpForm,
     HandoffForm,
     HolderForm,
@@ -24,7 +25,7 @@ from .forms import (
     UpdateForm,
     WorkspaceForm,
 )
-from .models import Holder, Stage, Task, Workspace
+from .models import Contact, Holder, Stage, Task, Workspace
 
 
 # --- Login with simple throttling -------------------------------------------------
@@ -86,7 +87,11 @@ def _selected_workspace(request):
 
 
 def _base_tasks(workspace):
-    qs = Task.objects.active_workspaces().select_related("workspace", "stage", "current_holder")
+    qs = (
+        Task.objects.active_workspaces()
+        .select_related("workspace", "stage", "current_holder")
+        .prefetch_related("current_holder__contacts")
+    )
     if workspace:
         qs = qs.filter(workspace=workspace)
     return qs
@@ -159,7 +164,10 @@ def task_list(request):
     if role in dict(Task.ROLE_CHOICES):
         qs = qs.filter(my_role=role)
 
-    holders = Holder.objects.filter(active=True, workspace__archived=False).select_related("workspace")
+    holders = (
+        Holder.objects.filter(active=True, workspace__archived=False)
+        .select_related("workspace").prefetch_related("contacts")
+    )
     if workspace:
         holders = holders.filter(workspace=workspace)
     return render(
@@ -213,8 +221,14 @@ def task_create(request, ws_pk):
 
 
 def task_detail(request, pk):
-    task = get_object_or_404(Task.objects.select_related("workspace", "stage", "current_holder"), pk=pk)
-    updates = task.updates.select_related("from_holder", "to_holder", "from_stage", "to_stage")
+    task = get_object_or_404(
+        Task.objects.select_related("workspace", "stage", "current_holder")
+        .prefetch_related("current_holder__contacts"),
+        pk=pk,
+    )
+    updates = task.updates.select_related("from_holder", "to_holder", "from_stage", "to_stage").prefetch_related(
+        "from_holder__contacts", "to_holder__contacts"
+    )
     return render(
         request,
         "tracker/task_detail.html",
@@ -253,7 +267,9 @@ def task_delete(request, pk):
 
 def _detail_with_errors(request, task, **forms):
     """Re-render the task page with a failed form's errors."""
-    updates = task.updates.select_related("from_holder", "to_holder", "from_stage", "to_stage")
+    updates = task.updates.select_related("from_holder", "to_holder", "from_stage", "to_stage").prefetch_related(
+        "from_holder__contacts", "to_holder__contacts"
+    )
     context = {
         "task": task,
         "workspace": task.workspace,
@@ -323,8 +339,9 @@ def task_follow_up(request, pk):
 # --- Workspaces, stages, holders --------------------------------------------------
 
 def workspace_list(request):
+    # distinct=True on both: two joined counts otherwise multiply each other.
     workspaces = Workspace.objects.annotate(
-        open_count=Count("tasks", filter=Q(tasks__stage__is_closed=False)),
+        open_count=Count("tasks", filter=Q(tasks__stage__is_closed=False), distinct=True),
         holder_count=Count("holders", distinct=True),
     )
     return render(request, "tracker/workspace_list.html", {"workspaces": workspaces})
@@ -342,7 +359,9 @@ def workspace_create(request):
 
 def workspace_detail(request, pk):
     workspace = get_object_or_404(Workspace, pk=pk)
-    holders = workspace.holders.annotate(open_count=Count("tasks", filter=Q(tasks__stage__is_closed=False)))
+    holders = workspace.holders.annotate(
+        open_count=Count("tasks", filter=Q(tasks__stage__is_closed=False))
+    ).prefetch_related("contacts")
     stages = workspace.stages.annotate(task_count=Count("tasks"))
     return render(
         request,
@@ -373,6 +392,9 @@ def holder_create(request, ws_pk):
         holder = form.save(commit=False)
         holder.workspace = workspace
         holder.save()
+        if holder.is_group:
+            messages.success(request, f"Added {holder.name}. Now add the people who work there.")
+            return redirect(holder)
         messages.success(request, f"Added {holder.name}.")
         return redirect(workspace)
     return render(
@@ -387,7 +409,7 @@ def holder_edit(request, pk):
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "Saved.")
-        return redirect(holder.workspace)
+        return redirect(holder if holder.is_group else holder.workspace)
     return render(
         request, "tracker/form.html",
         {"form": form, "title": f"Edit {holder.name}", "cancel_url": holder.workspace.get_absolute_url()},
@@ -431,3 +453,58 @@ def stage_delete(request, pk):
         stage.delete()
         messages.success(request, "Stage removed.")
     return redirect(stage.workspace)
+
+
+# --- People inside a department / committee ---------------------------------------
+
+def holder_detail(request, pk):
+    holder = get_object_or_404(Holder.objects.select_related("workspace"), pk=pk)
+    open_tasks = (
+        holder.tasks.open().select_related("workspace", "stage", "current_holder")
+        .prefetch_related("current_holder__contacts")
+    )
+    return render(
+        request,
+        "tracker/holder_detail.html",
+        {"holder": holder, "workspace": holder.workspace, "contacts": holder.contacts.all(),
+         "open_tasks": open_tasks},
+    )
+
+
+def contact_create(request, holder_pk):
+    holder = get_object_or_404(Holder, pk=holder_pk)
+    is_first = not holder.contacts.exists()
+    form = ContactForm(request.POST or None, initial={"is_primary": is_first})
+    if request.method == "POST" and form.is_valid():
+        contact = form.save(commit=False)
+        contact.holder = holder
+        contact.save()
+        messages.success(request, f"Added {contact.name} to {holder.name}.")
+        return redirect(holder)
+    return render(
+        request, "tracker/form.html",
+        {"form": form, "title": f"Add a person to {holder.name}", "cancel_url": holder.get_absolute_url()},
+    )
+
+
+def contact_edit(request, pk):
+    contact = get_object_or_404(Contact.objects.select_related("holder"), pk=pk)
+    form = ContactForm(request.POST or None, instance=contact)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Saved.")
+        return redirect(contact.holder)
+    return render(
+        request, "tracker/form.html",
+        {"form": form, "title": f"Edit {contact.name} ({contact.holder.name})",
+         "cancel_url": contact.holder.get_absolute_url()},
+    )
+
+
+@require_POST
+def contact_delete(request, pk):
+    contact = get_object_or_404(Contact.objects.select_related("holder"), pk=pk)
+    holder = contact.holder
+    contact.delete()
+    messages.success(request, f"Removed {contact.name}.")
+    return redirect(holder)

@@ -1,0 +1,54 @@
+{% extends "tracker/base.html" %}
+{% block title %}{{ holder.name }}{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{{ workspace.get_absolute_url }}">{{ workspace.name }}</a> ›</p>
+<div class="pagehead">
+  <h1>{{ holder.name }} <span class="tag">{{ holder.get_kind_display }}</span>{% if not holder.active %} <span class="muted">(inactive)</span>{% endif %}</h1>
+  <a class="btn" href="{% url 'holder_edit' holder.pk %}">Edit</a>
+</div>
+{% if holder.phone or holder.email %}
+<p class="contactlinks">
+  {% if holder.phone %}<a href="tel:{{ holder.phone_link }}">📞 {{ holder.phone }}</a>{% endif %}
+  {% if holder.email %}<a href="mailto:{{ holder.email }}">✉ {{ holder.email }}</a>{% endif %}
+</p>
+{% endif %}
+{% if holder.notes %}<p class="muted">{{ holder.notes|linebreaksbr }}</p>{% endif %}
+
+{% if holder.is_group %}
+<section class="card">
+  <div class="cardhead">
+    <h2>People <span class="count">{{ contacts|length }}</span></h2>
+    <a class="btn btn-small btn-primary" href="{% url 'contact_create' holder.pk %}">+ Add person</a>
+  </div>
+  {% for c in contacts %}
+  <div class="person {% if not c.active %}inactive{% endif %}">
+    <div class="person-main">
+      <strong>{{ c.name }}</strong>
+      {% if c.role %}<span class="role">{{ c.role }}</span>{% endif %}
+      {% if c.is_primary %}<span class="badge badge-main">★ Main contact</span>{% endif %}
+      {% if not c.active %}<span class="muted">· no longer here</span>{% endif %}
+      {% if c.phone or c.email %}
+      <div class="contactlinks">
+        {% if c.phone %}<a href="tel:{{ c.phone_link }}">📞 {{ c.phone }}</a>{% endif %}
+        {% if c.email %}<a href="mailto:{{ c.email }}">✉ {{ c.email }}</a>{% endif %}
+      </div>
+      {% endif %}
+      {% if c.notes %}<small class="muted">{{ c.notes }}</small>{% endif %}
+    </div>
+    <div class="person-actions">
+      <a href="{% url 'contact_edit' c.pk %}">Edit</a>
+      <form method="post" action="{% url 'contact_delete' c.pk %}" hx-confirm="Remove {{ c.name }}?">{% csrf_token %}<button class="linklike text-red" type="submit">Remove</button></form>
+    </div>
+  </div>
+  {% empty %}
+  <p class="muted">No people yet. Add the manager and anyone else you deal with, with their role.</p>
+  {% endfor %}
+</section>
+{% endif %}
+
+<h2 class="section">Open tasks on this desk</h2>
+<div class="card">
+  {% for task in open_tasks %}{% include "tracker/partials/task_row.html" %}
+  {% empty %}<p class="muted">Nothing open with {{ holder.name }}.</p>{% endfor %}
+</div>
+{% endblock %}

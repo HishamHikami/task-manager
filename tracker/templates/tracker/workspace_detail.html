@@ -20,7 +20,7 @@
     <table class="list">
       {% for h in holders %}
       <tr class="{% if not h.active %}inactive{% endif %}">
-        <td><strong>{{ h.name }}</strong><br><small class="muted">{{ h.get_kind_display }}{% if h.is_group and h.contact_person %} · contact: {{ h.contact_person }}{% endif %}{% if h.phone %} · <a href="tel:{{ h.phone_link }}">{{ h.phone }}</a>{% endif %}{% if h.email %} · <a href="mailto:{{ h.email }}">{{ h.email }}</a>{% endif %}{% if not h.active %} · inactive{% endif %}</small></td>
+        <td><a href="{{ h.get_absolute_url }}"><strong>{{ h.name }}</strong></a><br><small class="muted">{{ h.get_kind_display }}{% if h.is_group %} · {{ h.contacts.all|length }} {% if h.contacts.all|length == 1 %}person{% else %}people{% endif %}{% with m=h.primary_contact %}{% if m %} · ★ {{ m.name }}{% if m.role %} ({{ m.role }}){% endif %}{% endif %}{% endwith %}{% endif %}{% if h.phone %} · <a href="tel:{{ h.phone_link }}">{{ h.phone }}</a>{% endif %}{% if h.email %} · <a href="mailto:{{ h.email }}">{{ h.email }}</a>{% endif %}{% if not h.active %} · inactive{% endif %}</small></td>
         <td class="num"><a href="{% url 'task_list' %}?ws={{ workspace.pk }}&holder={{ h.pk }}">{{ h.open_count }} open</a></td>
         <td class="num"><a href="{% url 'holder_edit' h.pk %}">Edit</a></td>
       </tr>

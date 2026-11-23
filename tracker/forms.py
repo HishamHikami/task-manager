@@ -1,7 +1,7 @@
 from django import forms
 from django.utils import timezone
 
-from .models import Holder, Stage, Task, Update, Workspace
+from .models import Contact, Holder, Stage, Task, Update, Workspace
 
 
 class DateInput(forms.DateInput):
@@ -45,7 +45,7 @@ class StageForm(forms.ModelForm):
 class HolderForm(forms.ModelForm):
     class Meta:
         model = Holder
-        fields = ["name", "kind", "contact_person", "phone", "email", "notes", "active"]
+        fields = ["name", "kind", "phone", "email", "notes", "active"]
         widgets = {
             "notes": forms.Textarea(attrs={"rows": 2}),
             "phone": forms.TextInput(attrs={"type": "tel", "autocomplete": "tel", "inputmode": "tel"}),
@@ -67,6 +67,20 @@ class HolderForm(forms.ModelForm):
         return name
 
 
+class ContactForm(forms.ModelForm):
+    class Meta:
+        model = Contact
+        fields = ["name", "role", "is_primary", "phone", "email", "notes", "active"]
+        widgets = {
+            "notes": forms.Textarea(attrs={"rows": 2}),
+            "phone": forms.TextInput(attrs={"type": "tel", "autocomplete": "tel", "inputmode": "tel"}),
+            "email": forms.EmailInput(attrs={"autocomplete": "email"}),
+        }
+
+    def clean_phone(self):
+        return " ".join(self.cleaned_data["phone"].split())
+
+
 class HolderChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, obj):
         return obj.display_name
@@ -85,23 +99,33 @@ class NewHolderMixin(forms.Form):
         label="New holder type", choices=Holder.KIND_CHOICES, initial="person", required=False
     )
     new_holder_contact_person = forms.CharField(
-        label="Point of contact",
+        label="Main contact",
         max_length=120,
         required=False,
         help_text="For a department, committee or outside party: the person you deal with.",
+    )
+    new_holder_contact_role = forms.CharField(
+        label="Their role", max_length=120, required=False, help_text="e.g. Manager, Secretary."
     )
 
     def resolve_holder(self, workspace, field="current_holder"):
         name = (self.cleaned_data.get("new_holder") or "").strip()
         if name:
-            holder, _ = Holder.objects.get_or_create(
+            holder, created = Holder.objects.get_or_create(
                 workspace=workspace,
                 name=name,
-                defaults={
-                    "kind": self.cleaned_data.get("new_holder_kind") or "person",
-                    "contact_person": (self.cleaned_data.get("new_holder_contact_person") or "").strip(),
-                },
+                defaults={"kind": self.cleaned_data.get("new_holder_kind") or "person"},
             )
+            person = (self.cleaned_data.get("new_holder_contact_person") or "").strip()
+            if person and holder.is_group:
+                Contact.objects.get_or_create(
+                    holder=holder,
+                    name=person,
+                    defaults={
+                        "role": (self.cleaned_data.get("new_holder_contact_role") or "").strip(),
+                        "is_primary": created or not holder.contacts.filter(is_primary=True).exists(),
+                    },
+                )
             return holder
         return self.cleaned_data.get(field)
 
@@ -138,7 +162,7 @@ class TaskForm(NewHolderMixin, forms.ModelForm):
 
     field_order = [
         "title", "description", "my_role", "stage", "current_holder", "new_holder",
-        "new_holder_kind", "new_holder_contact_person", "priority", "due_date", "follow_up_date", "follow_up_note",
+        "new_holder_kind", "new_holder_contact_person", "new_holder_contact_role", "priority", "due_date", "follow_up_date", "follow_up_note",
         "reference", "first_note",
     ]
 
@@ -146,9 +170,7 @@ class TaskForm(NewHolderMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.workspace = workspace
         self.fields["stage"].queryset = workspace.stages.all()
-        self.fields["current_holder"].queryset = workspace.holders.filter(active=True) | workspace.holders.filter(
-            pk=self.instance.current_holder_id or 0
-        )
+        self.fields["current_holder"].queryset = workspace.holders.filter(active=True).prefetch_related("contacts")
         self.fields["current_holder"].required = False
         if not self.instance.pk:
             self.fields["stage"].initial = workspace.first_open_stage()
@@ -156,7 +178,7 @@ class TaskForm(NewHolderMixin, forms.ModelForm):
             # Holder and stage changes on an existing task go through hand-off /
             # stage forms so they are recorded on the timeline.
             for name in ["stage", "current_holder", "new_holder", "new_holder_kind",
-                         "new_holder_contact_person", "first_note"]:
+                         "new_holder_contact_person", "new_holder_contact_role", "first_note"]:
                 self.fields.pop(name)
 
 
@@ -190,13 +212,14 @@ class HandoffForm(NewHolderMixin):
     follow_up_date = forms.DateField(label="Follow up on", widget=DateInput(), required=False)
 
     field_order = ["to_holder", "new_holder", "new_holder_kind", "new_holder_contact_person",
-                   "note", "occurred_at", "follow_up_date"]
+                   "new_holder_contact_role", "note", "occurred_at", "follow_up_date"]
 
     def __init__(self, *args, task, **kwargs):
         super().__init__(*args, **kwargs)
         self.task = task
-        self.fields["to_holder"].queryset = task.workspace.holders.filter(active=True).exclude(
-            pk=task.current_holder_id or 0
+        self.fields["to_holder"].queryset = (
+            task.workspace.holders.filter(active=True).exclude(pk=task.current_holder_id or 0)
+            .prefetch_related("contacts")
         )
         self.fields["occurred_at"].initial = timezone.localtime().replace(second=0, microsecond=0)
 

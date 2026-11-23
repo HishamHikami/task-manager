@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from . import services
-from .models import Holder, Task, Workspace
+from .models import Contact, Holder, Task, Workspace
 
 
 class BaseCase(TestCase):
@@ -145,30 +145,62 @@ class AdminLoginTests(TestCase):
         self.assertEqual(resp.request["PATH_INFO"], "/login/")
 
 
-class ContactPersonTests(BaseCase):
-    def test_display_name_for_groups_only(self):
-        self.finance.contact_person = "Sara"
-        self.finance.save()
-        self.assertEqual(self.finance.display_name, "Finance (Sara)")
-        person = Holder.objects.create(workspace=self.ws, name="Omar", kind="person", contact_person="ignored")
+class PeopleTests(BaseCase):
+    def test_display_name_uses_main_contact_for_groups_only(self):
+        Contact.objects.create(holder=self.finance, name="Ahmed", role="Accountant")
+        Contact.objects.create(holder=self.finance, name="Sara", role="Manager", is_primary=True)
+        self.assertEqual(Holder.objects.get(pk=self.finance.pk).display_name, "Finance (Sara)")
+        person = Holder.objects.create(workspace=self.ws, name="Omar", kind="person")
         self.assertEqual(person.display_name, "Omar")
 
-    def test_new_holder_with_contact_person_from_handoff(self):
+    def test_only_one_main_contact(self):
+        a = Contact.objects.create(holder=self.finance, name="Sara", is_primary=True)
+        Contact.objects.create(holder=self.finance, name="Ahmed", is_primary=True)
+        a.refresh_from_db()
+        self.assertFalse(a.is_primary)
+        self.assertEqual(self.finance.contacts.filter(is_primary=True).count(), 1)
+
+    def test_inactive_people_are_not_main_contact(self):
+        Contact.objects.create(holder=self.finance, name="Old Manager", is_primary=True, active=False)
+        Contact.objects.create(holder=self.finance, name="New Manager")
+        self.assertEqual(Holder.objects.get(pk=self.finance.pk).display_name, "Finance (New Manager)")
+
+    def test_new_holder_with_main_contact_from_handoff(self):
         task = self.make_task()
         self.client.post(reverse("task_handoff", args=[task.pk]),
                          {"new_holder": "Legal", "new_holder_kind": "department",
-                          "new_holder_contact_person": "Mr. Khalid"})
+                          "new_holder_contact_person": "Mr. Khalid", "new_holder_contact_role": "Legal Manager"})
         task.refresh_from_db()
         self.assertEqual(task.current_holder.name, "Legal")
-        self.assertEqual(task.current_holder.contact_person, "Mr. Khalid")
+        c = task.current_holder.contacts.get()
+        self.assertEqual((c.name, c.role, c.is_primary), ("Mr. Khalid", "Legal Manager", True))
         resp = self.client.get(task.get_absolute_url())
         self.assertContains(resp, "Legal (Mr. Khalid)")
+        self.assertContains(resp, "Legal Manager")
 
-    def test_holder_form_saves_contact_person(self):
-        self.client.post(reverse("holder_create", args=[self.ws.pk]),
-                         {"name": "Events Committee", "kind": "committee", "contact_person": "Br. Ali",
-                          "active": "on"})
-        self.assertEqual(Holder.objects.get(name="Events Committee").contact_person, "Br. Ali")
+    def test_add_edit_remove_people(self):
+        resp = self.client.post(reverse("contact_create", args=[self.finance.pk]),
+                                {"name": "Sara", "role": "Finance Manager", "is_primary": "on",
+                                 "phone": "+966 11 222 3333", "active": "on"})
+        self.assertRedirects(resp, self.finance.get_absolute_url())
+        self.client.post(reverse("contact_create", args=[self.finance.pk]),
+                         {"name": "Ahmed", "role": "Accountant", "email": "ahmed@example.com", "active": "on"})
+        page = self.client.get(self.finance.get_absolute_url())
+        self.assertContains(page, "Finance Manager")
+        self.assertContains(page, "Accountant")
+        self.assertContains(page, "★ Main contact")
+        ahmed = Contact.objects.get(name="Ahmed")
+        self.client.post(reverse("contact_edit", args=[ahmed.pk]),
+                         {"name": "Ahmed", "role": "Senior Accountant", "active": "on"})
+        ahmed.refresh_from_db()
+        self.assertEqual(ahmed.role, "Senior Accountant")
+        self.client.post(reverse("contact_delete", args=[ahmed.pk]))
+        self.assertFalse(Contact.objects.filter(pk=ahmed.pk).exists())
+
+    def test_new_group_holder_goes_to_people_page(self):
+        resp = self.client.post(reverse("holder_create", args=[self.ws.pk]),
+                                {"name": "HR", "kind": "department", "active": "on"})
+        self.assertRedirects(resp, Holder.objects.get(name="HR").get_absolute_url())
 
 
 class PhoneEmailTests(BaseCase):
@@ -201,3 +233,11 @@ class PhoneEmailTests(BaseCase):
         resp = self.client.get(self.make_task().get_absolute_url())
         self.assertContains(resp, 'href="tel:+966112223333"')
         self.assertContains(resp, 'href="mailto:finance@example.com"')
+
+
+class WorkspaceCountTests(BaseCase):
+    def test_open_count_not_inflated_by_holders(self):
+        self.make_task(title="One")
+        self.make_task(title="Two")
+        resp = self.client.get(reverse("workspace_list"))
+        self.assertContains(resp, "2 open · 2 departments/people")

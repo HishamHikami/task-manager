@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Holder, Stage, Task, Update, Workspace
+from .models import Contact, Holder, Stage, Task, Update, Workspace
 
 
 class StageInline(admin.TabularInline):
@@ -33,8 +33,15 @@ class TaskAdmin(admin.ModelAdmin):
     inlines = [UpdateInline]
 
 
+class ContactInline(admin.TabularInline):
+    model = Contact
+    extra = 0
+    fields = ["name", "role", "is_primary", "phone", "email", "active"]
+
+
 @admin.register(Holder)
 class HolderAdmin(admin.ModelAdmin):
+    inlines = [ContactInline]
     list_display = ["name", "workspace", "kind", "active"]
     list_filter = ["workspace", "kind", "active"]
     search_fields = ["name"]

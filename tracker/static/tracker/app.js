@@ -1,8 +1,11 @@
-// Show "Point of contact" only when the holder type is a group
+// Show the "Main contact" fields only when the holder type is a group
 // (department, committee or outside party), not a single person.
 (function () {
   var GROUP_KINDS = ["department", "committee", "external"];
-  var PAIRS = [["kind", "contact_person"], ["new_holder_kind", "new_holder_contact_person"]];
+  var PAIRS = [
+    ["new_holder_kind", "new_holder_contact_person"],
+    ["new_holder_kind", "new_holder_contact_role"],
+  ];
 
   function sync(root) {
     PAIRS.forEach(function (pair) {
