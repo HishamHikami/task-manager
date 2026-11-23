@@ -578,3 +578,5 @@ body.no-nav .container { max-width: 420px; padding-top: 12vh; }
 }
 .choice-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .choice-row .radiocard { flex: 1 1 auto; white-space: nowrap; border-radius: 999px; padding: 7px 14px; }
+/* Tab bar always on top of page content (chat composer included) */
+@media (max-width: 899px) { body.has-nav .tabbar { z-index: 40; } .composer { z-index: 30; } }

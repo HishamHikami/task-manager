@@ -1,3 +1,4 @@
+import json
 import re
 from datetime import timedelta
 
@@ -560,7 +561,7 @@ class EventTests(BaseCase):
         self.assertEqual(resp["Content-Type"], "text/calendar; charset=utf-8")
         body = resp.content.decode()
         self.assertIn("BEGIN:VEVENT", body)
-        self.assertIn("SUMMARY:Talk\\, with commas\; and semicolons", body)
+        self.assertIn(r"SUMMARY:Talk\, with commas\; and semicolons", body)
         self.assertIn("My role: Speaker / Lecturer", body)
         self.assertIn("STATUS:TENTATIVE", body)
 
@@ -844,3 +845,117 @@ class ChatCaptureTests(AIBase):
         resp = self.client.post(reverse("capture"), {"text": "Hi", "workspace": self.ws.pk, "use_ai": "1"}, **self.HX)
         self.assertContains(resp, "No AI key yet")
         self.assertContains(resp, "You can still file it yourself")
+
+
+class ApiTests(BaseCase):
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        resp = self.client.post("/api/v1/auth/login", data=json.dumps(
+            {"username": "owner", "password": "a-long-test-password", "device": "Pixel"}),
+            content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+        self.token = resp.json()["token"]
+        self.client.logout()  # API must work without the session cookie
+        self.auth = {"HTTP_AUTHORIZATION": f"Bearer {self.token}"}
+
+    def get(self, url):
+        return self.client.get(url, **self.auth)
+
+    def post(self, url, data, method="post"):
+        return getattr(self.client, method)(url, data=json.dumps(data), content_type="application/json", **self.auth)
+
+    def test_token_hashed_and_required(self):
+        from .models import ApiToken
+        self.assertFalse(ApiToken.objects.filter(key_hash=self.token).exists())
+        self.assertEqual(self.client.get("/api/v1/dashboard").status_code, 401)
+        self.assertEqual(self.client.get("/api/v1/dashboard", HTTP_AUTHORIZATION="Bearer nope").status_code, 401)
+        self.assertEqual(self.get("/api/v1/dashboard").status_code, 200)
+
+    def test_wrong_password_and_lockout(self):
+        for _ in range(5):
+            r = self.client.post("/api/v1/auth/login", data=json.dumps({"username": "owner", "password": "x"}),
+                                 content_type="application/json")
+        self.assertEqual(r.status_code, 401)
+        r = self.client.post("/api/v1/auth/login", data=json.dumps({"username": "owner", "password": "x"}),
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 429)
+
+    def test_logout_revokes_token(self):
+        self.post("/api/v1/auth/logout", {})
+        self.assertEqual(self.get("/api/v1/dashboard").status_code, 401)
+
+    def test_bootstrap_and_dashboard(self):
+        self.make_task(due_date=timezone.localdate() - timedelta(days=1))
+        b = self.get("/api/v1/bootstrap").json()
+        self.assertEqual(b["workspaces"][0]["name"], "Company")
+        d = self.get("/api/v1/dashboard").json()
+        self.assertEqual(d["stats"]["attention"], 1)
+        self.assertEqual(d["attention"][0]["pill"]["tone"], "red")
+        self.assertEqual(d["groups"][0]["title"], "Finance")
+
+    def test_create_task_and_detail_and_handoff(self):
+        sara = Contact.objects.create(holder=self.gm, name="Sara", role="Secretary", email="s@x.com")
+        r = self.post("/api/v1/tasks", {"workspace": self.ws.pk, "title": "Renew license",
+                                        "current_holder": f"h{self.finance.pk}", "first_note": "Expires soon"})
+        self.assertEqual(r.status_code, 201)
+        tid = r.json()["task"]["id"]
+        d = self.get(f"/api/v1/tasks/{tid}").json()["task"]
+        self.assertEqual(d["desk"], "Finance")
+        self.assertEqual(d["timeline"][0]["kind"], "created")
+        self.assertIn({"value": f"c{sara.pk}", "label": "Sara · Secretary"},
+                      [o for g in d["handoff_options"] for o in g["options"]])
+        r = self.post(f"/api/v1/tasks/{tid}/handoff", {"to_holder": f"c{sara.pk}", "note": "For signature"})
+        self.assertEqual(r.json()["task"]["desk"], "Sara · GM Office")
+        self.assertEqual(r.json()["task"]["person"]["email"], "s@x.com")
+
+    def test_validation_errors_are_readable(self):
+        r = self.post("/api/v1/tasks", {"workspace": self.ws.pk})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("title", r.json()["errors"])
+
+    def test_update_stage_followup_patch_delete(self):
+        task = self.make_task()
+        r = self.post(f"/api/v1/tasks/{task.pk}/updates", {"kind": "email", "body": "Approved", "source": "Ali"})
+        self.assertEqual(r.json()["task"]["timeline"][0]["body"], "Approved")
+        done = self.ws.stages.get(name="Done")
+        self.assertTrue(self.post(f"/api/v1/tasks/{task.pk}/stage", {"stage": done.pk}).json()["task"]["is_closed"])
+        r = self.post(f"/api/v1/tasks/{task.pk}/follow-up", {"follow_up_date": "2026-12-01"})
+        self.assertEqual(r.json()["task"]["follow_up_date"], "2026-12-01")
+        r = self.post(f"/api/v1/tasks/{task.pk}", {"title": "Renamed"}, method="patch")
+        self.assertEqual(r.json()["task"]["title"], "Renamed")
+        self.assertEqual(self.client.delete(f"/api/v1/tasks/{task.pk}", **self.auth).status_code, 200)
+        self.assertFalse(Task.objects.filter(pk=task.pk).exists())
+
+    def test_events(self):
+        r = self.post("/api/v1/events", {"workspace": self.ws.pk, "title": "Forum", "kind": "conference",
+                                         "my_role": "speaker", "status": "invited", "start": "2026-12-10T18:00"})
+        self.assertEqual(r.status_code, 201)
+        eid = r.json()["event"]["id"]
+        r = self.post(f"/api/v1/events/{eid}", {"status": "confirmed"}, method="patch")
+        self.assertEqual(r.json()["event"]["status_short"], "Going")
+        self.assertEqual(self.get("/api/v1/events?show=upcoming").json()["events"][0]["title"], "Forum")
+
+    def test_people(self):
+        r = self.post(f"/api/v1/workspaces/{self.ws.pk}/holders", {"name": "Huda", "kind": "person",
+                                                                   "department": self.finance.pk, "role": "AP"})
+        self.assertEqual(r.status_code, 201)
+        self.assertTrue(r.json()["desk"].startswith("c"))
+        h = self.get(f"/api/v1/holders/{self.finance.pk}").json()["holder"]
+        self.assertEqual(h["people"][0]["name"], "Huda")
+        ws = self.get(f"/api/v1/workspaces/{self.ws.pk}").json()
+        self.assertEqual({x["name"] for x in ws["holders"]}, {"Finance", "GM Office"})
+
+    def test_capture_without_ai(self):
+        task = self.make_task()
+        r = self.post("/api/v1/capture/suggest", {"workspace": self.ws.pk, "text": "Dear team, approved. Regards"})
+        self.assertEqual(r.json()["suggestion"]["kind"], "email")
+        r = self.post("/api/v1/capture/save", {"workspace": self.ws.pk, "action": "update_task", "task": task.pk,
+                                               "body": "Approved", "kind": "email", "summary": "Approved"})
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.json()["type"], "task")
+        self.assertTrue(task.updates.filter(kind="email").exists())
+
+    def test_cookie_session_is_not_enough(self):
+        self.client.force_login(self.user)
+        self.assertEqual(self.client.get("/api/v1/dashboard").status_code, 401)

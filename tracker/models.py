@@ -520,3 +520,33 @@ class AIUsage(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+
+class ApiToken(models.Model):
+    """A login for the phone app. Only a SHA-256 hash of the token is stored."""
+
+    user = models.ForeignKey("auth.User", on_delete=models.CASCADE, related_name="api_tokens")
+    key_hash = models.CharField(max_length=64, unique=True)
+    device = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user} · {self.device or 'app'}"
+
+    @staticmethod
+    def hash(raw):
+        import hashlib
+
+        return hashlib.sha256(raw.encode()).hexdigest()
+
+    @classmethod
+    def issue(cls, user, device=""):
+        import secrets
+
+        raw = "tm_" + secrets.token_urlsafe(32)
+        cls.objects.create(user=user, key_hash=cls.hash(raw), device=device[:100])
+        return raw
