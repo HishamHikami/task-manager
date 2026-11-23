@@ -70,22 +70,21 @@ class ViewTests(BaseCase):
         self.assertContains(resp, "Task A")
         self.assertContains(resp, "GM Office")
 
-    def test_create_task_with_new_holder(self):
+    def test_create_task(self):
         resp = self.client.post(
             reverse("task_create", args=[self.ws.pk]),
             {
                 "title": "Renew trade license",
                 "my_role": "following",
                 "stage": self.ws.first_open_stage().pk,
-                "new_holder": "PRO Services",
-                "new_holder_kind": "department",
+                "current_holder": self.gm.pk,
                 "priority": 3,
                 "first_note": "Expires end of month",
             },
         )
         task = Task.objects.get(title="Renew trade license")
         self.assertRedirects(resp, task.get_absolute_url())
-        self.assertEqual(task.current_holder.name, "PRO Services")
+        self.assertEqual(task.current_holder, self.gm)
         self.assertEqual(task.updates.get(kind="created").body, "Expires end of month")
 
     def test_handoff_view_with_follow_up(self):
@@ -165,19 +164,6 @@ class PeopleTests(BaseCase):
         Contact.objects.create(holder=self.finance, name="New Manager")
         self.assertEqual(Holder.objects.get(pk=self.finance.pk).display_name, "Finance (New Manager)")
 
-    def test_new_holder_with_main_contact_from_handoff(self):
-        task = self.make_task()
-        self.client.post(reverse("task_handoff", args=[task.pk]),
-                         {"new_holder": "Legal", "new_holder_kind": "department",
-                          "new_holder_contact_person": "Mr. Khalid", "new_holder_contact_role": "Legal Manager"})
-        task.refresh_from_db()
-        self.assertEqual(task.current_holder.name, "Legal")
-        c = task.current_holder.contacts.get()
-        self.assertEqual((c.name, c.role, c.is_primary), ("Mr. Khalid", "Legal Manager", True))
-        resp = self.client.get(task.get_absolute_url())
-        self.assertContains(resp, "Legal (Mr. Khalid)")
-        self.assertContains(resp, "Legal Manager")
-
     def test_add_edit_remove_people(self):
         resp = self.client.post(reverse("contact_create", args=[self.finance.pk]),
                                 {"name": "Sara", "role": "Finance Manager", "is_primary": "on",
@@ -241,3 +227,66 @@ class WorkspaceCountTests(BaseCase):
         self.make_task(title="Two")
         resp = self.client.get(reverse("workspace_list"))
         self.assertContains(resp, "2 open · 2 departments/people")
+
+
+class AddHolderFromTaskTests(BaseCase):
+    def test_task_form_has_button_not_inline_fields(self):
+        resp = self.client.get(reverse("task_create", args=[self.ws.pk]))
+        self.assertNotContains(resp, 'name="new_holder"')
+        self.assertContains(resp, "+ New department / person")
+        self.assertContains(resp, "/holders/new/?next=%2Fworkspaces%2F")
+
+    def test_person_returns_straight_to_task_form_preselected(self):
+        back = reverse("task_create", args=[self.ws.pk])
+        url = reverse("holder_create", args=[self.ws.pk]) + "?next=" + back
+        resp = self.client.post(url, {"name": "Omar", "kind": "person", "active": "on"})
+        omar = Holder.objects.get(name="Omar")
+        self.assertRedirects(resp, f"{back}?holder={omar.pk}", fetch_redirect_response=False)
+        page = self.client.get(f"{back}?holder={omar.pk}")
+        self.assertContains(page, f'<option value="{omar.pk}" selected>')
+
+    def test_department_goes_via_people_page_then_back(self):
+        back = reverse("task_create", args=[self.ws.pk])
+        resp = self.client.post(reverse("holder_create", args=[self.ws.pk]) + "?next=" + back,
+                                {"name": "Legal", "kind": "department", "active": "on"})
+        legal = Holder.objects.get(name="Legal")
+        people_page = f"{legal.get_absolute_url()}?next={back.replace('/', '%2F')}"
+        self.assertRedirects(resp, people_page, fetch_redirect_response=False)
+        # add a person, staying in the return flow
+        resp = self.client.post(reverse("contact_create", args=[legal.pk]) + "?next=" + back,
+                                {"name": "Khalid", "role": "Legal Manager", "active": "on"})
+        self.assertRedirects(resp, people_page, fetch_redirect_response=False)
+        page = self.client.get(people_page)
+        self.assertContains(page, "Use Legal for the task")
+        self.assertContains(page, f"{back}?holder={legal.pk}")
+
+    def test_handoff_returns_with_panel_open_and_holder_selected(self):
+        task = self.make_task()
+        page = self.client.get(f"{task.get_absolute_url()}?holder={self.gm.pk}")
+        self.assertContains(page, '<details class="panel" open>')
+        self.assertContains(page, f'<option value="{self.gm.pk}" selected>')
+
+    def test_external_next_is_ignored(self):
+        resp = self.client.post(reverse("holder_create", args=[self.ws.pk]) + "?next=https://evil.example/",
+                                {"name": "Omar", "kind": "person", "active": "on"})
+        self.assertRedirects(resp, self.ws.get_absolute_url(), fetch_redirect_response=False)
+
+    def test_holder_from_other_workspace_not_preselected(self):
+        other = Workspace.objects.create(name="Org")
+        stranger = Holder.objects.create(workspace=other, name="Stranger")
+        page = self.client.get(reverse("task_create", args=[self.ws.pk]) + f"?holder={stranger.pk}")
+        self.assertNotContains(page, "Stranger")
+
+
+class CopyButtonTests(BaseCase):
+    def test_copy_buttons_next_to_phone_and_email(self):
+        self.finance.phone = "+966 11 222 3333"
+        self.finance.email = "finance@example.com"
+        self.finance.save()
+        Contact.objects.create(holder=self.finance, name="Sara", role="Manager", email="sara@example.com")
+        for url in [self.make_task().get_absolute_url(), self.finance.get_absolute_url(),
+                    self.ws.get_absolute_url()]:
+            page = self.client.get(url)
+            self.assertContains(page, 'data-copy="+966 11 222 3333"')
+            self.assertContains(page, 'data-copy="finance@example.com"')
+        self.assertContains(self.client.get(self.finance.get_absolute_url()), 'data-copy="sara@example.com"')

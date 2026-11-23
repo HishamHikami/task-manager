@@ -1,28 +1,76 @@
-// Show the "Main contact" fields only when the holder type is a group
-// (department, committee or outside party), not a single person.
+// Keep what was typed in a form while the user goes to add a new
+// department/person, and fill it back in when they return.
 (function () {
-  var GROUP_KINDS = ["department", "committee", "external"];
-  var PAIRS = [
-    ["new_holder_kind", "new_holder_contact_person"],
-    ["new_holder_kind", "new_holder_contact_role"],
-  ];
+  var SKIP = { csrfmiddlewaretoken: 1, current_holder: 1, to_holder: 1 };
 
-  function sync(root) {
-    PAIRS.forEach(function (pair) {
-      (root || document).querySelectorAll('select[name="' + pair[0] + '"]').forEach(function (select) {
-        var form = select.form;
-        var target = form && form.querySelector('[data-field="' + pair[1] + '"]');
-        if (target) target.hidden = GROUP_KINDS.indexOf(select.value) === -1;
+  function keyFor(form) {
+    return "draft:" + (form.getAttribute("action") || location.pathname);
+  }
+
+  document.addEventListener("click", function (e) {
+    var link = e.target.closest && e.target.closest("[data-keep-draft]");
+    if (!link) return;
+    var form = link.closest("form");
+    if (!form) return;
+    var data = {};
+    Array.prototype.forEach.call(form.elements, function (el) {
+      if (!el.name || SKIP[el.name] || el.type === "submit") return;
+      data[el.name] = el.type === "checkbox" ? el.checked : el.value;
+    });
+    try { sessionStorage.setItem(keyFor(form), JSON.stringify(data)); } catch (err) { /* storage off */ }
+  }, true);
+
+  function restore() {
+    // Only when coming back with a newly added department/person selected.
+    if (!/[?&]holder=\d+/.test(location.search)) return;
+    document.querySelectorAll("form").forEach(function (form) {
+      var key = keyFor(form), raw = null;
+      try { raw = sessionStorage.getItem(key); } catch (err) { return; }
+      if (!raw) return;
+      var data = JSON.parse(raw);
+      Object.keys(data).forEach(function (name) {
+        var el = form.elements[name];
+        if (!el || el.length > 1 && !el.tagName) return;
+        if (el.type === "checkbox") el.checked = data[name]; else el.value = data[name];
       });
+      try { sessionStorage.removeItem(key); } catch (err) { /* ignore */ }
     });
   }
 
-  document.addEventListener("change", function (e) {
-    if (e.target.matches && e.target.matches('select[name="kind"], select[name="new_holder_kind"]')) sync(e.target.form);
-  });
-  document.addEventListener("DOMContentLoaded", function () { sync(); });
-  // hx-boost swaps the page body; re-check after every swap and history restore.
-  ["htmx:afterSettle", "htmx:historyRestore"].forEach(function (ev) {
-    document.addEventListener(ev, function () { sync(); });
+  document.addEventListener("DOMContentLoaded", restore);
+  document.addEventListener("htmx:afterSettle", restore);
+})();
+
+// One-click copy for phone numbers and email addresses.
+(function () {
+  function fallbackCopy(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok ? Promise.resolve() : Promise.reject();
+  }
+
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest && e.target.closest(".copybtn");
+    if (!btn) return;
+    e.preventDefault();
+    var text = btn.getAttribute("data-copy") || "";
+    var copy = navigator.clipboard && window.isSecureContext
+      ? navigator.clipboard.writeText(text).catch(function () { return fallbackCopy(text); })
+      : fallbackCopy(text);
+    copy.then(function () {
+      btn.classList.add("copied");
+      clearTimeout(btn._copiedTimer);
+      btn._copiedTimer = setTimeout(function () { btn.classList.remove("copied"); }, 1500);
+    }, function () {
+      window.prompt("Copy this:", text);
+    });
   });
 })();

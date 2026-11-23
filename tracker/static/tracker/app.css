@@ -244,3 +244,19 @@ table.list form { margin: 0; }
 .people-mini summary { cursor: pointer; color: var(--accent); }
 .people-mini ul { margin: 6px 0; padding-left: 18px; }
 .people-mini li { margin: 2px 0; }
+.cl-item { display: inline-flex; align-items: center; gap: 2px; min-width: 0; }
+.cl-item a { word-break: break-all; }
+.copybtn {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 30px; height: 30px; padding: 0; border: 1px solid transparent; border-radius: 6px;
+  background: none; color: var(--muted); cursor: pointer;
+}
+.copybtn:hover { border-color: var(--border); color: var(--text); background: var(--bg); }
+.copybtn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.copybtn.copied { color: var(--green); border-color: var(--green); }
+.copybtn.copied::after { content: "Copied"; font-size: .75rem; margin-left: 4px; }
+.copybtn.copied { width: auto; padding: 0 6px; }
+.copybtn.copied svg { display: none; }
+td .contactlinks { margin-top: 2px; font-size: .85rem; }
+.add-holder { align-self: flex-start; margin-top: 2px; }
+.backbar { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }

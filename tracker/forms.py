@@ -86,51 +86,7 @@ class HolderChoiceField(forms.ModelChoiceField):
         return obj.display_name
 
 
-class NewHolderMixin(forms.Form):
-    """Lets a form pick an existing holder or type a new name on the spot."""
-
-    new_holder = forms.CharField(
-        label="…or add someone new",
-        max_length=120,
-        required=False,
-        help_text="Type a name to create a new department/person in this workspace.",
-    )
-    new_holder_kind = forms.ChoiceField(
-        label="New holder type", choices=Holder.KIND_CHOICES, initial="person", required=False
-    )
-    new_holder_contact_person = forms.CharField(
-        label="Main contact",
-        max_length=120,
-        required=False,
-        help_text="For a department, committee or outside party: the person you deal with.",
-    )
-    new_holder_contact_role = forms.CharField(
-        label="Their role", max_length=120, required=False, help_text="e.g. Manager, Secretary."
-    )
-
-    def resolve_holder(self, workspace, field="current_holder"):
-        name = (self.cleaned_data.get("new_holder") or "").strip()
-        if name:
-            holder, created = Holder.objects.get_or_create(
-                workspace=workspace,
-                name=name,
-                defaults={"kind": self.cleaned_data.get("new_holder_kind") or "person"},
-            )
-            person = (self.cleaned_data.get("new_holder_contact_person") or "").strip()
-            if person and holder.is_group:
-                Contact.objects.get_or_create(
-                    holder=holder,
-                    name=person,
-                    defaults={
-                        "role": (self.cleaned_data.get("new_holder_contact_role") or "").strip(),
-                        "is_primary": created or not holder.contacts.filter(is_primary=True).exists(),
-                    },
-                )
-            return holder
-        return self.cleaned_data.get(field)
-
-
-class TaskForm(NewHolderMixin, forms.ModelForm):
+class TaskForm(forms.ModelForm):
     first_note = forms.CharField(
         label="Background / first note",
         required=False,
@@ -161,9 +117,8 @@ class TaskForm(NewHolderMixin, forms.ModelForm):
         field_classes = {"current_holder": HolderChoiceField}
 
     field_order = [
-        "title", "description", "my_role", "stage", "current_holder", "new_holder",
-        "new_holder_kind", "new_holder_contact_person", "new_holder_contact_role", "priority", "due_date", "follow_up_date", "follow_up_note",
-        "reference", "first_note",
+        "title", "description", "my_role", "stage", "current_holder", "priority", "due_date",
+        "follow_up_date", "follow_up_note", "reference", "first_note",
     ]
 
     def __init__(self, *args, workspace, **kwargs):
@@ -177,8 +132,7 @@ class TaskForm(NewHolderMixin, forms.ModelForm):
         else:
             # Holder and stage changes on an existing task go through hand-off /
             # stage forms so they are recorded on the timeline.
-            for name in ["stage", "current_holder", "new_holder", "new_holder_kind",
-                         "new_holder_contact_person", "new_holder_contact_role", "first_note"]:
+            for name in ["stage", "current_holder", "first_note"]:
                 self.fields.pop(name)
 
 
@@ -205,14 +159,14 @@ class UpdateForm(forms.ModelForm):
         return data
 
 
-class HandoffForm(NewHolderMixin):
-    to_holder = HolderChoiceField(queryset=Holder.objects.none(), required=False, label="Hand to")
+class HandoffForm(forms.Form):
+    to_holder = HolderChoiceField(
+        queryset=Holder.objects.none(), label="Hand to",
+        error_messages={"required": "Choose who the task goes to."},
+    )
     note = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))
     occurred_at = forms.DateTimeField(label="When", widget=DateTimeInput(), required=False)
     follow_up_date = forms.DateField(label="Follow up on", widget=DateInput(), required=False)
-
-    field_order = ["to_holder", "new_holder", "new_holder_kind", "new_holder_contact_person",
-                   "new_holder_contact_role", "note", "occurred_at", "follow_up_date"]
 
     def __init__(self, *args, task, **kwargs):
         super().__init__(*args, **kwargs)
@@ -222,12 +176,6 @@ class HandoffForm(NewHolderMixin):
             .prefetch_related("contacts")
         )
         self.fields["occurred_at"].initial = timezone.localtime().replace(second=0, microsecond=0)
-
-    def clean(self):
-        data = super().clean()
-        if not data.get("to_holder") and not (data.get("new_holder") or "").strip():
-            raise forms.ValidationError("Choose who the task goes to, or type a new name.")
-        return data
 
 
 class StageChangeForm(forms.Form):

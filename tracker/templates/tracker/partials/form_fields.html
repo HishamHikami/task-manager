@@ -8,6 +8,9 @@
     <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="req">*</span>{% endif %}</label>
     {{ field }}
   {% endif %}
+  {% if add_holder_url and field.name == "current_holder" or add_holder_url and field.name == "to_holder" %}
+    <a class="btn btn-small add-holder" data-keep-draft href="{{ add_holder_url }}" hx-boost="false">+ New department / person</a>
+  {% endif %}
   {% if field.help_text %}<small class="help">{{ field.help_text }}</small>{% endif %}
   {% for e in field.errors %}<small class="error">{{ e }}</small>{% endfor %}
 </div>
