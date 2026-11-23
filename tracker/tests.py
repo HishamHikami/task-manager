@@ -286,7 +286,8 @@ class CopyButtonTests(BaseCase):
         self.finance.email = "finance@example.com"
         self.finance.save()
         Contact.objects.create(holder=self.finance, name="Sara", role="Manager", email="sara@example.com")
-        for url in [self.finance.get_absolute_url(), self.ws.get_absolute_url()]:
+        # Department page shows the department's own phone/email; the workspace list stays uncluttered.
+        for url in [self.finance.get_absolute_url()]:
             page = self.client.get(url)
             self.assertContains(page, 'data-copy="+966 11 222 3333"')
             self.assertContains(page, 'data-copy="finance@example.com"')
@@ -342,7 +343,8 @@ class DoingItMyselfTests(BaseCase):
         self.post_task()
         page = self.client.get(reverse("dashboard")).content.decode()
         self.assertIn("On my desk", page)
-        self.assertLess(page.index("On my desk"), page.index("Finance ·"))
+        self.assertLess(page.index('<span class="group-title">On my desk'),
+                        page.index('<span class="group-title">Finance'))
 
     def test_following_up_keeps_holder(self):
         task = self.post_task(my_role="following", current_holder=self.finance.pk)
@@ -534,7 +536,8 @@ class EventTests(BaseCase):
         self.assertContains(self.client.get(reverse("event_list")), "Annual community lecture")
         dash = self.client.get(reverse("dashboard"))
         self.assertContains(dash, "Coming up")
-        self.assertContains(dash, "1 invitation to answer")
+        self.assertContains(dash, "Invites to answer")
+        self.assertContains(dash, '<span class="stat-n warn">1</span><span class="stat-l">Invites to answer')
         self.assertContains(self.client.get(reverse("event_list") + "?show=invites"), "Annual community lecture")
 
     def test_status_change(self):

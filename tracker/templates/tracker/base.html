@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#1f3a5f">
   <title>{% block title %}Tasks{% endblock %} · Task Manager</title>
   <link rel="manifest" href="{% url 'manifest' %}">
@@ -14,38 +14,75 @@
   <script src="{% static 'tracker/htmx.min.js' %}" defer></script>
   <script src="{% static 'tracker/app.js' %}" defer></script>
 </head>
-<body hx-boost="true" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+{% with n=request.resolver_match.url_name %}
+<body hx-boost="true" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' class="{% if user.is_authenticated %}has-nav{% else %}no-nav{% endif %}">
 {% if user.is_authenticated %}
-<header class="topbar">
-  <a class="brand" href="{% url 'dashboard' %}">Task Manager</a>
-  <nav class="mainnav">
-    <a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">Dashboard</a>
-    <a href="{% url 'task_list' %}" class="{% if request.resolver_match.url_name == 'task_list' %}active{% endif %}">Tasks</a>
-    <a href="{% url 'event_list' %}" class="{% if 'event' in request.resolver_match.url_name %}active{% endif %}">Events</a>
-    <a href="{% url 'workspace_list' %}" class="{% if 'workspace' in request.resolver_match.url_name %}active{% endif %}">Workspaces</a>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-tasks" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1.5 1.5L7.5 5M3.5 12l1.5 1.5L7.5 11M3.5 18l1.5 1.5L7.5 17"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></symbol>
+  <symbol id="i-ws" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-out" viewBox="0 0 24 24"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3"/></symbol>
+</svg>
+
+{# Desktop: sidebar #}
+<aside class="sidebar">
+  <a class="brand" href="{% url 'dashboard' %}"><img src="{% static 'tracker/icons/icon.svg' %}" alt="" width="28" height="28"> Task Manager</a>
+  <div class="side-actions">
+    <a class="btn btn-primary btn-block" href="{% url 'capture' %}"><svg class="i"><use href="#i-bolt"/></svg> Capture</a>
+    <a class="btn btn-block" href="{% url 'task_new' %}"><svg class="i"><use href="#i-plus"/></svg> New task</a>
+  </div>
+  <nav class="side-nav">
+    <a href="{% url 'dashboard' %}" class="{% if n == 'dashboard' %}active{% endif %}"><svg class="i"><use href="#i-home"/></svg> Dashboard</a>
+    <a href="{% url 'task_list' %}" class="{% if n == 'task_list' or n == 'task_detail' or n == 'task_edit' or n == 'task_create' or n == 'task_new' %}active{% endif %}"><svg class="i"><use href="#i-tasks"/></svg> Tasks</a>
+    <a href="{% url 'event_list' %}" class="{% if 'event' in n %}active{% endif %}"><svg class="i"><use href="#i-cal"/></svg> Events</a>
+    <a href="{% url 'workspace_list' %}" class="{% if 'workspace' in n or 'holder' in n or 'contact' in n or 'stage' in n %}active{% endif %}"><svg class="i"><use href="#i-ws"/></svg> Workspaces</a>
   </nav>
-  <div class="topactions">
-    <button type="button" class="btn btn-install" id="install-btn" hidden>⤓ Install<span class="hide-xs"> app</span></button>
-    <a class="btn" href="{% url 'capture' %}" title="Paste or share a message">⚡ Capture</a>
-    <a class="btn btn-primary" href="{% url 'task_new' %}">+ <span class="hide-xs">New </span>task</a>
-    <a class="iconbtn {% if request.resolver_match.url_name == 'settings' %}active{% endif %}" href="{% url 'settings' %}" title="Settings" aria-label="Settings">⚙</a>
-    <form method="post" action="{% url 'logout' %}" class="logout">{% csrf_token %}<button class="linklike" type="submit">Log out</button></form>
+  <div class="side-foot">
+    <button type="button" class="side-link" id="install-btn" hidden><svg class="i"><use href="#i-down"/></svg> Install app</button>
+    <a class="side-link {% if n == 'settings' %}active{% endif %}" href="{% url 'settings' %}"><svg class="i"><use href="#i-gear"/></svg> Settings</a>
+    <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="side-link" type="submit"><svg class="i"><use href="#i-out"/></svg> Log out</button></form>
+  </div>
+</aside>
+
+{# Phone: slim top bar + bottom tabs #}
+<header class="mbar">
+  <a class="brand" href="{% url 'dashboard' %}"><img src="{% static 'tracker/icons/icon.svg' %}" alt="" width="26" height="26"> Task Manager</a>
+  <div class="mbar-actions">
+    <button type="button" class="iconbtn" data-install hidden aria-label="Install app" title="Install app"><svg class="i"><use href="#i-down"/></svg></button>
+    <a class="iconbtn {% if n == 'settings' %}active{% endif %}" href="{% url 'settings' %}" aria-label="Settings" title="Settings"><svg class="i"><use href="#i-gear"/></svg></a>
+    <a class="iconbtn iconbtn-primary" href="{% url 'task_new' %}" aria-label="New task" title="New task"><svg class="i"><use href="#i-plus"/></svg></a>
   </div>
 </header>
-{% if nav_workspaces and request.resolver_match.url_name in 'dashboard,task_list,event_list' %}
-<div class="wsbar">
-  <a href="?ws=all" class="chip {% if not nav_selected_ws %}chip-on{% endif %}">All</a>
-  {% for ws in nav_workspaces %}
-  <a href="?ws={{ ws.pk }}" class="chip c-{{ ws.color }} {% if nav_selected_ws == ws.pk %}chip-on{% endif %}">{{ ws.name }}</a>
-  {% endfor %}
-</div>
+<nav class="tabbar">
+  <a href="{% url 'dashboard' %}" class="{% if n == 'dashboard' %}active{% endif %}"><svg class="i"><use href="#i-home"/></svg><span>Home</span></a>
+  <a href="{% url 'task_list' %}" class="{% if n == 'task_list' or n == 'task_detail' or n == 'task_edit' or n == 'task_create' or n == 'task_new' %}active{% endif %}"><svg class="i"><use href="#i-tasks"/></svg><span>Tasks</span></a>
+  <a href="{% url 'capture' %}" class="tab-capture {% if 'capture' in n %}active{% endif %}"><span class="bolt"><svg class="i"><use href="#i-bolt"/></svg></span><span>Capture</span></a>
+  <a href="{% url 'event_list' %}" class="{% if 'event' in n %}active{% endif %}"><svg class="i"><use href="#i-cal"/></svg><span>Events</span></a>
+  <a href="{% url 'workspace_list' %}" class="{% if 'workspace' in n or 'holder' in n or 'contact' in n or 'stage' in n %}active{% endif %}"><svg class="i"><use href="#i-ws"/></svg><span>Workspaces</span></a>
+</nav>
 {% endif %}
-{% endif %}
-<main class="container">
-  {% for message in messages %}
-  <div class="flash flash-{{ message.tags }}">{{ message }}</div>
-  {% endfor %}
-  {% block content %}{% endblock %}
+
+<main class="main">
+  <div class="container">
+    {% for message in messages %}
+    <div class="flash flash-{{ message.tags }}" role="status">{{ message }}</div>
+    {% endfor %}
+    {% if user.is_authenticated and nav_workspaces|length > 1 and n in 'dashboard,task_list,event_list' %}
+    <div class="segmented" aria-label="Workspace">
+      <a href="?ws=all" class="{% if not nav_selected_ws %}on{% endif %}">All</a>
+      {% for ws in nav_workspaces %}
+      <a href="?ws={{ ws.pk }}" class="{% if nav_selected_ws == ws.pk %}on{% endif %}"><span class="dot c-{{ ws.color }}"></span>{{ ws.name }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </div>
 </main>
 </body>
+{% endwith %}
 </html>

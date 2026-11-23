@@ -2,7 +2,7 @@
 {% block title %}Tasks{% endblock %}
 {% block content %}
 <div class="pagehead">
-  <h1>Tasks{% if workspace %} · {{ workspace.name }}{% endif %}</h1>
+  <h1>Tasks</h1>
 </div>
 <form class="filters card" method="get" hx-get="{% url 'task_list' %}" hx-trigger="change, keyup changed delay:400ms from:input[name=q]" hx-target="body" hx-push-url="true">
   <input type="search" name="q" value="{{ q }}" placeholder="Search tasks and timeline text…">
@@ -21,8 +21,8 @@
   </select>
   <noscript><button class="btn" type="submit">Filter</button></noscript>
 </form>
-<div class="card">
+<div class="card list">
   {% for task in tasks %}{% include "tracker/partials/task_row.html" %}
-  {% empty %}<p class="muted">No tasks match.</p>{% endfor %}
+  {% empty %}<p class="muted empty-row">No tasks match.</p>{% endfor %}
 </div>
 {% endblock %}

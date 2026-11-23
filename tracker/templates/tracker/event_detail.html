@@ -1,22 +1,28 @@
 {% extends "tracker/base.html" %}
 {% block title %}{{ event.title }}{% endblock %}
 {% block content %}
-<div class="card taskhead">
-  <div class="taskhead-top">
-    <span class="tag c-{{ event.workspace.color }}">{{ event.workspace.name }}</span>
-    <span class="tag">{{ event.get_kind_display }}</span>
-    <span class="badge status-{{ event.status }}">{{ event.get_status_display }}</span>
-    <a class="btn btn-small right" href="{% url 'event_edit' event.pk %}">Edit</a>
+<p class="crumbs"><a href="{% url 'event_list' %}">Events</a> ›</p>
+<div class="detail-head">
+  <div class="eyebrow">
+    <span class="dot c-{{ event.workspace.color }}"></span>{{ event.workspace.name }}
+    <span class="sep">{{ event.get_kind_display }}</span>
+    <span class="pill status-{{ event.status }}">{{ event.status_short }}</span>
   </div>
-  <h1>{{ event.title }}</h1>
+  <div class="title-row">
+    <h1>{{ event.title }}</h1>
+    <a class="btn btn-small btn-ghost" href="{% url 'event_edit' event.pk %}">Edit</a>
+  </div>
   <p class="myrole">My role: <strong>{{ event.get_my_role_display }}</strong></p>
+</div>
+
+<div class="card">
   <dl class="facts">
-    <div><dt>When</dt><dd>{{ event.start|date:"D d M Y, H:i" }}{% if event.end %}<br><span class="muted">until {% if event.end|date:"Ymd" == event.start|date:"Ymd" %}{{ event.end|date:"H:i" }}{% else %}{{ event.end|date:"D d M Y, H:i" }}{% endif %}</span>{% endif %}</dd></div>
-    {% if event.location or event.online_link %}<div><dt>Where</dt><dd>{% if event.location %}{{ event.location }}{% endif %}{% if event.online_link %}<br><a href="{{ event.online_link }}" target="_blank" rel="noopener noreferrer">💻 Join online</a>{% endif %}</dd></div>{% endif %}
-    {% if event.organizer_name %}<div><dt>Organized / invited by</dt><dd><strong>{{ event.organizer_name }}</strong>
+    <div class="fact"><dt>When</dt><dd>{{ event.start|date:"D, j M Y · H:i" }}{% if event.end %}<span class="role-line">until {% if event.end|date:"Ymd" == event.start|date:"Ymd" %}{{ event.end|date:"H:i" }}{% else %}{{ event.end|date:"D, j M Y · H:i" }}{% endif %}</span>{% endif %}</dd></div>
+    {% if event.location or event.online_link %}<div class="fact"><dt>Where</dt><dd>{% if event.location %}{{ event.location }}{% endif %}{% if event.online_link %}<span class="role-line"><a href="{{ event.online_link }}" target="_blank" rel="noopener noreferrer">Join online</a></span>{% endif %}</dd></div>{% endif %}
+    {% if event.organizer_name %}<div class="fact"><dt>Invited by</dt><dd><strong>{{ event.organizer_name }}</strong>
       {% with p=event.organizer_person %}{% if p %}{% include "tracker/partials/contact_links.html" %}{% elif event.organizer %}{% include "tracker/partials/contact_links.html" with p=event.organizer %}{% endif %}{% endwith %}</dd></div>{% endif %}
-    {% if event.my_topic %}<div><dt>My topic</dt><dd>🎤 {{ event.my_topic }}{% if event.duration_minutes %}<br><span class="muted">{{ event.duration_minutes }} minutes</span>{% endif %}</dd></div>{% endif %}
-    {% if event.audience %}<div><dt>Audience</dt><dd>{{ event.audience }}</dd></div>{% endif %}
+    {% if event.my_topic %}<div class="fact"><dt>My topic</dt><dd>{{ event.my_topic }}{% if event.duration_minutes %}<span class="role-line">{{ event.duration_minutes }} minutes</span>{% endif %}</dd></div>{% endif %}
+    {% if event.audience %}<div class="fact"><dt>Audience</dt><dd>{{ event.audience }}</dd></div>{% endif %}
   </dl>
 </div>
 
@@ -28,15 +34,15 @@
       {% if value != event.status %}<button class="btn btn-small" name="status" value="{{ value }}" type="submit">{{ label }}</button>{% endif %}
     {% endfor %}
   </form>
-  <a class="btn" href="{% url 'event_ics' event.pk %}" hx-boost="false" download>📅 Add to my calendar</a>
+  <a class="btn btn-small" href="{% url 'event_ics' event.pk %}" hx-boost="false" download>Add to calendar</a>
 </div>
 
 {% if event.description %}
-<h2 class="section">Details</h2>
+<h2 class="section-title">Details</h2>
 <div class="card"><div class="prewrap">{{ event.description }}</div></div>
 {% endif %}
 {% if event.preparation %}
-<h2 class="section">Preparation / to-do</h2>
+<h2 class="section-title">Preparation / to-do</h2>
 <div class="card"><div class="prewrap">{{ event.preparation }}</div></div>
 {% endif %}
 {% endblock %}

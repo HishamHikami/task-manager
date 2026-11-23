@@ -2,61 +2,78 @@
 {% block title %}Dashboard{% endblock %}
 {% block content %}
 <div class="pagehead">
-  <h1>{% if workspace %}{{ workspace.name }}{% else %}All workspaces{% endif %}</h1>
-  <span class="muted">{{ open_count }} open task{{ open_count|pluralize }}</span>
+  <div>
+    <h1>{% if workspace %}{{ workspace.name }}{% else %}Dashboard{% endif %}</h1>
+    <p class="sub">{{ today|date:"l, j F" }}</p>
+  </div>
 </div>
 
 {% if not nav_workspaces %}
 <div class="card empty">
   <h2>Welcome</h2>
-  <p>Start by creating a workspace for each area you track, for example <strong>Company</strong> and your <strong>organization</strong>. Then add the departments and people who handle tasks.</p>
+  <p class="muted">Create a workspace for each area you track — for example <strong>Company</strong> and your <strong>organization</strong>. Then add the departments and people who handle tasks.</p>
   <a class="btn btn-primary" href="{% url 'workspace_create' %}">Create a workspace</a>
 </div>
 {% else %}
 
-{% if overdue or follow_ups %}
-<section class="attention">
-  {% if follow_ups %}
-  <div class="card">
-    <h2>🔔 Needs a nudge today <span class="count">{{ follow_ups|length }}</span></h2>
-    {% for task in follow_ups %}
-      {% include "tracker/partials/task_row.html" %}
-      {% if task.follow_up_note %}<div class="fu-note">↳ {{ task.follow_up_note }}</div>{% endif %}
-    {% endfor %}
+<div class="stats">
+  <a class="stat" href="#attention"><span class="stat-n{% if attention %} warn{% endif %}">{{ attention|length }}</span><span class="stat-l">Need attention</span></a>
+  <a class="stat" href="{% url 'task_list' %}"><span class="stat-n">{{ open_count }}</span><span class="stat-l">Open tasks</span></a>
+  <a class="stat" href="{% url 'event_list' %}"><span class="stat-n">{{ upcoming_events|length }}</span><span class="stat-l">Events, 2 weeks</span></a>
+  {% if open_invites %}<a class="stat" href="{% url 'event_list' %}?show=invites"><span class="stat-n warn">{{ open_invites }}</span><span class="stat-l">Invites to answer</span></a>{% endif %}
+</div>
+
+{% if attention %}
+<section class="section" id="attention">
+  <h2 class="section-title">Needs attention</h2>
+  <div class="card list">
+    {% for task in attention %}{% include "tracker/partials/task_row.html" with show_note=True %}{% endfor %}
   </div>
-  {% endif %}
-  {% if overdue %}
-  <div class="card">
-    <h2>⏰ Overdue <span class="count">{{ overdue|length }}</span></h2>
-    {% for task in overdue %}{% include "tracker/partials/task_row.html" %}{% endfor %}
-  </div>
-  {% endif %}
 </section>
 {% endif %}
 
-{% if upcoming_events or open_invites %}
-<h2 class="section">Coming up (next 2 weeks){% if open_invites %} · <a href="{% url 'event_list' %}?show=invites">{{ open_invites }} invitation{{ open_invites|pluralize }} to answer</a>{% endif %}</h2>
-<div class="card">
-  {% for event in upcoming_events %}{% include "tracker/partials/event_row.html" %}
-  {% empty %}<p class="muted">No confirmed events in the next two weeks.</p>{% endfor %}
-</div>
+{% if upcoming_events %}
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">Coming up</h2>
+    <a class="link-quiet" href="{% url 'event_list' %}">All events</a>
+  </div>
+  <div class="card list">
+    {% for event in upcoming_events %}{% include "tracker/partials/event_row.html" %}{% endfor %}
+  </div>
+</section>
 {% endif %}
 
-<h2 class="section">On whose desk</h2>
-{% for holder, tasks in by_holder.items %}
-<div class="card holdergroup">
-  <h3>{{ holder }} <span class="count">{{ tasks|length }}</span></h3>
-  {% for task in tasks %}{% include "tracker/partials/task_row.html" %}{% endfor %}
-</div>
-{% empty %}
-<div class="card empty"><p>No open tasks. <a href="{% url 'task_new' %}">Register one</a>.</p></div>
-{% endfor %}
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title">On whose desk</h2>
+    <span class="muted small">{{ open_count }} open</span>
+  </div>
+  {% if groups %}
+  <div class="card list grouped">
+    {% for g in groups %}
+    <div class="group">
+      <div class="group-head">
+        <span class="group-title">{{ g.title }}</span>
+        {% if g.workspace and not workspace %}<span class="group-ws"><span class="dot c-{{ g.workspace.color }}"></span>{{ g.workspace.name }}</span>{% endif %}
+        <span class="count">{{ g.tasks|length }}</span>
+      </div>
+      {% for task in g.tasks %}{% include "tracker/partials/task_row.html" with hide_desk=True hide_ws=True %}{% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card empty"><p class="muted">No open tasks. <a href="{% url 'task_new' %}">Register one</a> or use <a href="{% url 'capture' %}">Capture</a>.</p></div>
+  {% endif %}
+</section>
 
 {% if recent_closed %}
-<h2 class="section">Recently finished</h2>
-<div class="card">
-  {% for task in recent_closed %}{% include "tracker/partials/task_row.html" %}{% endfor %}
-</div>
+<details class="section fold">
+  <summary class="section-title">Recently finished</summary>
+  <div class="card list">
+    {% for task in recent_closed %}{% include "tracker/partials/task_row.html" %}{% endfor %}
+  </div>
+</details>
 {% endif %}
 {% endif %}
 {% endblock %}

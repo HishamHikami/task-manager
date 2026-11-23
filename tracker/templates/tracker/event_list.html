@@ -2,8 +2,8 @@
 {% block title %}Events{% endblock %}
 {% block content %}
 <div class="pagehead">
-  <h1>Events{% if workspace %} · {{ workspace.name }}{% endif %}</h1>
-  <a class="btn btn-primary" href="{% url 'event_new' %}">+ New event</a>
+  <h1>Events</h1>
+  <a class="btn btn-primary btn-small" href="{% url 'event_new' %}">+ New event</a>
 </div>
 <div class="tabs">
   <a href="?show=upcoming{% if role %}&role={{ role }}{% endif %}" class="{% if show == 'upcoming' %}on{% endif %}">Upcoming</a>
@@ -17,12 +17,12 @@
     </select>
   </form>
 </div>
-<div class="card">
+<div class="card list">
   {% for event in events %}
     {% ifchanged event.start|date:"F Y" %}<h3 class="monthhead">{{ event.start|date:"F Y" }}</h3>{% endifchanged %}
     {% include "tracker/partials/event_row.html" %}
   {% empty %}
-    <p class="muted">{% if show == 'past' %}No past events.{% elif show == 'invites' %}No invitations waiting for an answer.{% else %}Nothing coming up. <a href="{% url 'event_new' %}">Add an event</a>.{% endif %}</p>
+    <p class="muted empty-row">{% if show == 'past' %}No past events.{% elif show == 'invites' %}No invitations waiting for an answer.{% else %}Nothing coming up. <a href="{% url 'event_new' %}">Add an event</a>.{% endif %}</p>
   {% endfor %}
 </div>
 {% endblock %}

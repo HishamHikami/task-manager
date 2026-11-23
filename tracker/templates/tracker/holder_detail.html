@@ -9,10 +9,13 @@
 {% endif %}
 <p class="crumbs"><a href="{{ workspace.get_absolute_url }}">{{ workspace.name }}</a> ›</p>
 <div class="pagehead">
-  <h1>{{ holder.name }} <span class="tag">{{ holder.get_kind_display }}</span>{% if not holder.active %} <span class="muted">(inactive)</span>{% endif %}</h1>
-  <a class="btn" href="{% url 'holder_edit' holder.pk %}">Edit</a>
+  <div>
+    <h1>{{ holder.name }}</h1>
+    <p class="sub">{{ holder.get_kind_display }}{% if not holder.active %} · inactive{% endif %}</p>
+    {% include "tracker/partials/contact_links.html" with p=holder %}
+  </div>
+  <div><a class="btn btn-small" href="{% url 'holder_edit' holder.pk %}">Edit</a></div>
 </div>
-<p>{% include "tracker/partials/contact_links.html" with p=holder %}</p>
 {% if holder.notes %}<p class="muted">{{ holder.notes|linebreaksbr }}</p>{% endif %}
 
 {% if holder.is_group %}
@@ -43,9 +46,9 @@
 </section>
 {% endif %}
 
-<h2 class="section">Open tasks on this desk</h2>
-<div class="card">
-  {% for task in open_tasks %}{% include "tracker/partials/task_row.html" %}
-  {% empty %}<p class="muted">Nothing open with {{ holder.name }}.</p>{% endfor %}
+<h2 class="section-title">Open tasks on this desk</h2>
+<div class="card list">
+  {% for task in open_tasks %}{% include "tracker/partials/task_row.html" with hide_ws=True %}
+  {% empty %}<p class="muted empty-row">Nothing open with {{ holder.name }}.</p>{% endfor %}
 </div>
 {% endblock %}

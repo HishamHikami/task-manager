@@ -3,7 +3,7 @@
 {% block content %}
 <div class="pagehead">
   <h1>Workspaces</h1>
-  <a class="btn btn-primary" href="{% url 'workspace_create' %}">+ New workspace</a>
+  <a class="btn btn-primary btn-small" href="{% url 'workspace_create' %}">+ New workspace</a>
 </div>
 <div class="wsgrid">
   {% for ws in workspaces %}

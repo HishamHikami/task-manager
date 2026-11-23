@@ -453,6 +453,11 @@ class Event(models.Model):
         return self.organizer_other
 
     @property
+    def status_short(self):
+        return {"invited": "To answer", "tentative": "Maybe", "confirmed": "Going", "declined": "Declined",
+                "done": "Attended", "cancelled": "Cancelled"}.get(self.status, self.status)
+
+    @property
     def organizer_person(self):
         """The person to contact about the event, if known."""
         if self.organizer_contact_id:

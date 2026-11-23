@@ -158,7 +158,13 @@ def dashboard(request):
     overdue = [t for t in open_tasks if t.due_date and t.due_date < today]
     follow_ups = [t for t in open_tasks if t.follow_up_date and t.follow_up_date <= today]
 
-    by_holder = OrderedDict()
+    # One "needs attention" list: overdue or follow-up due, most urgent first, no duplicates.
+    attention = sorted(
+        {t.pk: t for t in overdue + follow_ups}.values(),
+        key=lambda t: (not t.is_overdue, -t.priority, t.due_date or t.follow_up_date or today),
+    )
+
+    groups = OrderedDict()
     for task in sorted(
         open_tasks,
         key=lambda t: (
@@ -168,14 +174,14 @@ def dashboard(request):
         ),
     ):
         if task.with_me:
-            label = "On my desk"
+            key, title = "me", "On my desk"
         elif task.current_holder:
-            label = task.desk_name
+            key, title = f"{task.current_holder_id}-{task.current_contact_id}", task.desk_name
         else:
-            label = "Not assigned to anyone"
-        if not workspace and task.current_holder:
-            label = f"{label} · {task.workspace.name}"
-        by_holder.setdefault(label, []).append(task)
+            key, title = "none", "Not assigned to anyone"
+        group = groups.setdefault(key, {"title": title, "workspace": task.workspace if task.current_holder else None,
+                                        "tasks": []})
+        group["tasks"].append(task)
 
     soon = timezone.now() + timedelta(days=14)
     upcoming_events = (
@@ -193,7 +199,8 @@ def dashboard(request):
             "workspace": workspace,
             "overdue": overdue,
             "follow_ups": follow_ups,
-            "by_holder": by_holder,
+            "attention": attention,
+            "groups": list(groups.values()),
             "open_count": len(open_tasks),
             "recent_closed": recent,
             "upcoming_events": upcoming_events,
@@ -664,8 +671,11 @@ def event_create(request, ws_pk):
 
 def event_detail(request, pk):
     event = get_object_or_404(_events_base(None), pk=pk)
+    short = {"invited": "Invited", "tentative": "Maybe", "confirmed": "Going", "declined": "Declined",
+             "done": "Attended", "cancelled": "Cancelled"}
     return render(request, "tracker/event_detail.html",
-                  {"event": event, "workspace": event.workspace, "statuses": Event.STATUS_CHOICES})
+                  {"event": event, "workspace": event.workspace,
+                   "statuses": [(v, short[v]) for v, _ in Event.STATUS_CHOICES]})
 
 
 def event_edit(request, pk):

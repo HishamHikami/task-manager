@@ -1,49 +1,59 @@
 {% extends "tracker/base.html" %}
 {% block title %}{{ workspace.name }}{% endblock %}
 {% block content %}
+<p class="crumbs"><a href="{% url 'workspace_list' %}">Workspaces</a> ›</p>
 <div class="pagehead">
-  <h1><span class="dot c-{{ workspace.color }}"></span>{{ workspace.name }}</h1>
   <div>
-    <a class="btn" href="{% url 'dashboard' %}?ws={{ workspace.pk }}">Open dashboard</a>
-    <a class="btn" href="{% url 'workspace_edit' workspace.pk %}">Edit</a>
+    <h1>{{ workspace.name }}</h1>
+    <p class="sub">{% if workspace.description %}{{ workspace.description }} · {% endif %}AI {% if workspace.ai_enabled %}allowed{% else %}<strong>off</strong>{% endif %}</p>
+  </div>
+  <div>
+    <a class="btn btn-small btn-ghost" href="{% url 'dashboard' %}?ws={{ workspace.pk }}">Dashboard</a>
+    <a class="btn btn-small" href="{% url 'workspace_edit' workspace.pk %}">Edit</a>
   </div>
 </div>
-{% if workspace.description %}<p class="muted">{{ workspace.description }}</p>{% endif %}
-<p class="muted">AI summaries: {% if workspace.ai_enabled %}allowed{% else %}<strong>off</strong> — text from this workspace is never sent to AI{% endif %}.</p>
 
-<div class="twocol">
-  <section class="card">
-    <div class="cardhead">
-      <h2>Departments &amp; people</h2>
-      <a class="btn btn-small btn-primary" href="{% url 'holder_create' workspace.pk %}">+ Add</a>
-    </div>
-    <table class="list">
-      {% for h in holders %}
-      <tr class="{% if not h.active %}inactive{% endif %}">
-        <td><a href="{{ h.get_absolute_url }}"><strong>{{ h.name }}</strong></a><br><small class="muted">{{ h.get_kind_display }}{% if h.is_group %} · {{ h.contacts.all|length }} {% if h.contacts.all|length == 1 %}person{% else %}people{% endif %}{% with m=h.primary_contact %}{% if m %} · ★ {{ m.name }}{% if m.role %} ({{ m.role }}){% endif %}{% endif %}{% endwith %}{% endif %}{% if not h.active %} · inactive{% endif %}</small>{% include "tracker/partials/contact_links.html" with p=h %}</td>
-        <td class="num"><a href="{% url 'task_list' %}?ws={{ workspace.pk }}&holder={{ h.pk }}">{{ h.open_count }} open</a></td>
-        <td class="num"><a href="{% url 'holder_edit' h.pk %}">Edit</a></td>
-      </tr>
-      {% empty %}
-      <tr><td class="muted">Nobody yet. Add the departments, committees or people you hand tasks to.</td></tr>
-      {% endfor %}
-    </table>
-  </section>
+<section class="card">
+  <div class="cardhead">
+    <h2>Departments &amp; people</h2>
+    <a class="btn btn-small btn-primary" href="{% url 'holder_create' workspace.pk %}">+ Add</a>
+  </div>
+  <ul class="ilist">
+    {% for h in holders %}
+    <li class="{% if not h.active %}inactive{% endif %}">
+      <div class="ilist-main">
+        <a href="{{ h.get_absolute_url }}">{{ h.name }}</a>
+        <span class="ilist-sub">{{ h.get_kind_display }}{% if h.is_group %} · {{ h.contacts.all|length }} {% if h.contacts.all|length == 1 %}person{% else %}people{% endif %}{% with m=h.primary_contact %}{% if m %} · ★ {{ m.name }}{% if m.role %}, {{ m.role }}{% endif %}{% endif %}{% endwith %}{% endif %}{% if not h.active %} · inactive{% endif %}</span>
+      </div>
+      <div class="ilist-side">
+        {% if h.open_count %}<a class="pill" href="{% url 'task_list' %}?ws={{ workspace.pk }}&holder={{ h.pk }}">{{ h.open_count }} open</a>{% endif %}
+      </div>
+    </li>
+    {% empty %}
+    <li class="muted">Nobody yet. Add the departments, committees or people you hand tasks to.</li>
+    {% endfor %}
+  </ul>
+</section>
 
-  <section class="card">
-    <div class="cardhead">
-      <h2>Stages</h2>
-      <a class="btn btn-small btn-primary" href="{% url 'stage_create' workspace.pk %}">+ Add</a>
-    </div>
-    <table class="list">
-      {% for s in stages %}
-      <tr>
-        <td><strong>{{ s.name }}</strong>{% if s.is_closed %} <small class="tag stage-closed">closes task</small>{% endif %}<br><small class="muted">order {{ s.order }} · {{ s.task_count }} task{{ s.task_count|pluralize }}</small></td>
-        <td class="num"><a href="{% url 'stage_edit' s.pk %}">Edit</a></td>
-        <td class="num">{% if not s.task_count %}<form method="post" action="{% url 'stage_delete' s.pk %}">{% csrf_token %}<button class="linklike text-red" type="submit">Remove</button></form>{% endif %}</td>
-      </tr>
-      {% endfor %}
-    </table>
-  </section>
-</div>
+<details class="card fold-card">
+  <summary class="cardhead">
+    <h2>Stages <span class="count">{{ stages|length }}</span></h2>
+    <span class="muted small">Registered → … → Done</span>
+  </summary>
+  <div class="actions" style="margin-top:4px"><a class="btn btn-small" href="{% url 'stage_create' workspace.pk %}">+ Add stage</a></div>
+  <ul class="ilist">
+    {% for s in stages %}
+    <li>
+      <div class="ilist-main">
+        <strong>{{ s.name }}</strong>
+        <span class="ilist-sub">{{ s.task_count }} task{{ s.task_count|pluralize }}{% if s.is_closed %} · <span class="stage-closed">closes the task</span>{% endif %}</span>
+      </div>
+      <div class="ilist-side">
+        <a href="{% url 'stage_edit' s.pk %}">Edit</a>
+        {% if not s.task_count %}<form method="post" action="{% url 'stage_delete' s.pk %}">{% csrf_token %}<button class="linklike text-red" type="submit">Remove</button></form>{% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</details>
 {% endblock %}
