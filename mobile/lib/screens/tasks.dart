@@ -10,7 +10,12 @@ import 'dashboard.dart' show appBarActions;
 import 'workspaces.dart';
 
 void openNewTask(BuildContext context, {int? workspaceId}) {
-  Navigator.of(context).push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => TaskFormScreen(workspaceId: workspaceId)));
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => TaskFormScreen(workspaceId: workspaceId),
+    ),
+  );
 }
 
 // ======================================================================= list
@@ -31,57 +36,94 @@ class _TasksScreenState extends State<TasksScreen> {
     final app = AppScope.of(context);
     final ws = app.workspaceFilter;
     return Scaffold(
-      appBar: AppBar(title: const Text('Tasks'), actions: appBarActions(context)),
-      floatingActionButton: FloatingActionButton(onPressed: () => openNewTask(context), tooltip: 'New task', child: const Icon(Icons.add)),
-      body: Column(children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-          child: SearchBar(
-            hintText: 'Search tasks and messages',
-            leading: const Icon(Icons.search),
-            elevation: const WidgetStatePropertyAll(0),
-            onChanged: (v) {
-              _debounce?.cancel();
-              _debounce = Timer(const Duration(milliseconds: 350), () => setState(() => _q = v.trim()));
-            },
+      appBar: AppBar(
+        title: const Text('Tasks'),
+        actions: appBarActions(context),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => openNewTask(context),
+        tooltip: 'New task',
+        child: const Icon(Icons.add),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+            child: SearchBar(
+              hintText: 'Search tasks and messages',
+              leading: const Icon(Icons.search),
+              elevation: const WidgetStatePropertyAll(0),
+              onChanged: (v) {
+                _debounce?.cancel();
+                _debounce = Timer(
+                  const Duration(milliseconds: 350),
+                  () => setState(() => _q = v.trim()),
+                );
+              },
+            ),
           ),
-        ),
-        const WorkspaceFilter(),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-          child: SegmentedButton<String>(
-            showSelectedIcon: false,
-            segments: const [
-              ButtonSegment(value: 'open', label: Text('Open')),
-              ButtonSegment(value: 'closed', label: Text('Finished')),
-              ButtonSegment(value: 'all', label: Text('All')),
-            ],
-            selected: {_status},
-            onSelectionChanged: (s) {
-              HapticFeedback.selectionClick();
-              setState(() => _status = s.first);
-            },
+          const WorkspaceFilter(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<String>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(value: 'open', label: Text('Open')),
+                  ButtonSegment(value: 'closed', label: Text('Finished')),
+                  ButtonSegment(value: 'all', label: Text('All')),
+                ],
+                selected: {_status},
+                onSelectionChanged: (s) {
+                  HapticFeedback.selectionClick();
+                  setState(() => _status = s.first);
+                },
+              ),
+            ),
           ),
-        ),
-        Expanded(
-          child: Loader(
-            key: ValueKey('tasks-$ws-$_status-$_q'),
-            load: () => app.api!.get('tasks', query: {'ws': ws?.toString() ?? '', 'status': _status, 'q': _q}),
-            builder: (context, d, reload) {
-              final tasks = (d['tasks'] as List).cast<Json>();
-              return RefreshList(onRefresh: reload, padding: const EdgeInsets.fromLTRB(16, 0, 16, 120), children: [
-                if (tasks.isEmpty)
-                  EmptyView(_q.isEmpty ? 'No tasks here.' : 'Nothing matches “$_q”.', icon: Icons.task_alt)
-                else
-                  ListCard(children: [
-                    for (final t in tasks)
-                      TaskTile(t, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TaskDetailScreen(id: t['id'] as int)))),
-                  ]),
-              ]);
-            },
+          Expanded(
+            child: Loader(
+              key: ValueKey('tasks-$ws-$_status-$_q'),
+              load: () => app.api!.get(
+                'tasks',
+                query: {'ws': ws?.toString() ?? '', 'status': _status, 'q': _q},
+              ),
+              builder: (context, d, reload) {
+                final tasks = (d['tasks'] as List).cast<Json>();
+                return RefreshList(
+                  onRefresh: reload,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
+                  children: [
+                    if (tasks.isEmpty)
+                      EmptyView(
+                        _q.isEmpty
+                            ? 'No tasks here.'
+                            : 'Nothing matches “$_q”.',
+                        icon: Icons.task_alt,
+                      )
+                    else
+                      ListCard(
+                        children: [
+                          for (final t in tasks)
+                            TaskTile(
+                              t,
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      TaskDetailScreen(id: t['id'] as int),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                  ],
+                );
+              },
+            ),
           ),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 }
@@ -115,7 +157,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   /// Runs an action, shows its message, refreshes this page and the lists behind it.
-  Future<bool> _act(Future<Json> Function(ApiClient api) call, {String? done}) async {
+  Future<bool> _act(
+    Future<Json> Function(ApiClient api) call, {
+    String? done,
+  }) async {
     final app = AppScope.read(context);
     try {
       final r = await call(app.api!);
@@ -136,14 +181,28 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     final t = _task;
     return Scaffold(
       appBar: AppBar(
-        title: Text(t == null ? '' : (t['workspace'] as Json)['name'] as String),
+        title: Text(
+          t == null ? '' : (t['workspace'] as Json)['name'] as String,
+        ),
         actions: [
           if (t != null)
             PopupMenuButton<String>(
               onSelected: (v) => v == 'edit' ? _edit(t) : _delete(t),
               itemBuilder: (_) => const [
-                PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit_outlined), title: Text('Edit'))),
-                PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete_outline), title: Text('Delete'))),
+                PopupMenuItem(
+                  value: 'edit',
+                  child: ListTile(
+                    leading: Icon(Icons.edit_outlined),
+                    title: Text('Edit'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: ListTile(
+                    leading: Icon(Icons.delete_outline),
+                    title: Text('Delete'),
+                  ),
+                ),
               ],
             ),
         ],
@@ -152,8 +211,16 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         duration: const Duration(milliseconds: 220),
         child: t == null
             ? (_error != null
-                ? ErrorView(_error!, onRetry: () { setState(() => _error = null); _load(); })
-                : const Center(child: CircularProgressIndicator(strokeWidth: 2.5)))
+                  ? ErrorView(
+                      _error!,
+                      onRetry: () {
+                        setState(() => _error = null);
+                        _load();
+                      },
+                    )
+                  : const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    ))
             : RefreshIndicator(onRefresh: _load, child: _body(context, t)),
       ),
     );
@@ -170,73 +237,185 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     final pri = t['priority'] as int;
 
     Widget fact(String label, Widget value) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant)),
-            const SizedBox(height: 3),
-            value,
-          ]),
-        );
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 3),
+          value,
+        ],
+      ),
+    );
 
     return ListView(
-      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
       children: [
-        Row(children: [
-          Dot(workspaceColor(ws['color'] as String?, b)),
-          const SizedBox(width: 8),
-          Flexible(child: Meta([(t['stage'] as Json)['name'] as String, t['my_role_label'] as String])),
-          if (pri >= 3) ...[const SizedBox(width: 8), Pill(t['priority_label'] as String, tone: pri >= 4 ? 'red' : 'amber')],
-        ]),
+        Row(
+          children: [
+            Dot(workspaceColor(ws['color'] as String?, b)),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Meta([
+                (t['stage'] as Json)['name'] as String,
+                t['my_role_label'] as String,
+              ]),
+            ),
+            if (pri >= 3) ...[
+              const SizedBox(width: 8),
+              Pill(
+                t['priority_label'] as String,
+                tone: pri >= 4 ? 'red' : 'amber',
+              ),
+            ],
+          ],
+        ),
         const SizedBox(height: 8),
-        Text(t['title'] as String, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, height: 1.2)),
+        Text(
+          t['title'] as String,
+          style: Theme.of(context).textTheme.headlineSmall
+              ?.copyWith(fontWeight: FontWeight.w800, height: 1.2),
+        ),
         if ((t['description'] as String).isNotEmpty) ...[
           const SizedBox(height: 8),
-          Text(t['description'] as String, style: TextStyle(color: cs.onSurfaceVariant)),
+          Text(
+            t['description'] as String,
+            style: TextStyle(color: cs.onSurfaceVariant),
+          ),
         ],
         const SizedBox(height: 16),
         Card(
           margin: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              fact(
-                'With',
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text.rich(TextSpan(children: [
-                    TextSpan(text: (t['desk'] as String).isEmpty ? 'Nobody yet' : t['desk'] as String, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                    if (t['days_with_holder'] != null)
-                      TextSpan(text: '  ·  ${t['days_with_holder']} day${t['days_with_holder'] == 1 ? '' : 's'}', style: TextStyle(color: cs.onSurfaceVariant)),
-                  ])),
-                  if (person != null && (person['role'] as String).isNotEmpty)
-                    Text('${person['name']} · ${person['role']}', style: TextStyle(color: cs.onSurfaceVariant)),
-                  if (contact != null) ...[
-                    if (contact['is_department'] == true && person != null)
-                      Text('Department contact:', style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant)),
-                    ContactActions(phone: contact['phone'] as String?, email: contact['email'] as String?),
-                  ],
-                  if (people.length > 1)
-                    TextButton.icon(
-                      style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
-                      icon: const Icon(Icons.groups_outlined, size: 18),
-                      label: Text('People at ${(t['holder'] as Json)['name']} (${people.length})'),
-                      onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => HolderScreen(id: (t['holder'] as Json)['id'] as int))),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                fact(
+                  'With',
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: (t['desk'] as String).isEmpty
+                                  ? 'Nobody yet'
+                                  : t['desk'] as String,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
+                            if (t['days_with_holder'] != null)
+                              TextSpan(
+                                text:
+                                    '  ·  ${t['days_with_holder']} day${t['days_with_holder'] == 1 ? '' : 's'}',
+                                style: TextStyle(color: cs.onSurfaceVariant),
+                              ),
+                          ],
+                        ),
+                      ),
+                      if (person != null &&
+                          (person['role'] as String).isNotEmpty)
+                        Text(
+                          '${person['name']} · ${person['role']}',
+                          style: TextStyle(color: cs.onSurfaceVariant),
+                        ),
+                      if (contact != null) ...[
+                        if (contact['is_department'] == true && person != null)
+                          Text(
+                            'Department contact:',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ContactActions(
+                          phone: contact['phone'] as String?,
+                          email: contact['email'] as String?,
+                        ),
+                      ],
+                      if (people.length > 1)
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          icon: const Icon(Icons.groups_outlined, size: 18),
+                          label: Text(
+                            'People at ${(t['holder'] as Json)['name']} (${people.length})',
+                          ),
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => HolderScreen(
+                                id: (t['holder'] as Json)['id'] as int,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Row(
+                  children: [
+                    Expanded(
+                      child: fact(
+                        'Due',
+                        Text(
+                          fmtDate(t['due_date'] as String?),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: t['is_overdue'] == true
+                                ? Tones.red(context)
+                                : null,
+                          ),
+                        ),
+                      ),
                     ),
-                ]),
-              ),
-              const Divider(height: 1),
-              Row(children: [
-                Expanded(child: fact('Due', Text(fmtDate(t['due_date'] as String?), style: TextStyle(fontWeight: FontWeight.w600, color: t['is_overdue'] == true ? Tones.red(context) : null)))),
-                Expanded(
-                    child: fact(
+                    Expanded(
+                      child: fact(
                         'Follow up',
-                        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(fmtDate(t['follow_up_date'] as String?), style: TextStyle(fontWeight: FontWeight.w600, color: t['follow_up_due'] == true ? Tones.amber(context) : null)),
-                          if ((t['follow_up_note'] as String).isNotEmpty) Text(t['follow_up_note'] as String, style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
-                        ]))),
-              ]),
-              if ((t['reference'] as String).isNotEmpty) ...[const Divider(height: 1), fact('Reference', Text(t['reference'] as String))],
-            ]),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              fmtDate(t['follow_up_date'] as String?),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: t['follow_up_due'] == true
+                                    ? Tones.amber(context)
+                                    : null,
+                              ),
+                            ),
+                            if ((t['follow_up_note'] as String).isNotEmpty)
+                              Text(
+                                t['follow_up_note'] as String,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if ((t['reference'] as String).isNotEmpty) ...[
+                  const Divider(height: 1),
+                  fact('Reference', Text(t['reference'] as String)),
+                ],
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 14),
@@ -248,14 +427,43 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           crossAxisSpacing: 8,
           childAspectRatio: 3.6,
           children: [
-            FilledButton.icon(onPressed: () => _handoff(t), icon: const Icon(Icons.forward_rounded), label: const Text('Hand off')),
-            FilledButton.tonalIcon(onPressed: () => _addUpdate(t), icon: const Icon(Icons.edit_note_rounded), label: const Text('Add update')),
-            OutlinedButton.icon(onPressed: () => _stage(t), icon: const Icon(Icons.swap_vert_rounded), label: const Text('Stage')),
-            OutlinedButton.icon(onPressed: () => _followUp(t), icon: const Icon(Icons.notifications_none_rounded), label: const Text('Follow-up')),
+            FilledButton.icon(
+              onPressed: () => _handoff(t),
+              icon: const Icon(Icons.forward_rounded),
+              label: const Text('Hand off'),
+            ),
+            FilledButton.tonalIcon(
+              onPressed: () => _addUpdate(t),
+              icon: const Icon(Icons.edit_note_rounded),
+              label: const Text('Add update'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => _stage(t),
+              icon: const Icon(Icons.swap_vert_rounded),
+              label: const Text('Stage'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => _followUp(t),
+              icon: const Icon(Icons.notifications_none_rounded),
+              label: const Text('Follow-up'),
+            ),
           ],
         ),
         const SectionTitle('Timeline'),
-        for (var i = 0; i < timeline.length; i++) _TimelineEntry(timeline[i], last: i == timeline.length - 1, canAi: t['can_use_ai'] == true, onSummarize: (id) => _act((api) => api.post('updates/$id/summarize', {}, const Duration(seconds: 75)), done: 'Summary added')),
+        for (var i = 0; i < timeline.length; i++)
+          _TimelineEntry(
+            timeline[i],
+            last: i == timeline.length - 1,
+            canAi: t['can_use_ai'] == true,
+            onSummarize: (id) => _act(
+              (api) => api.post(
+                'updates/$id/summarize',
+                {},
+                const Duration(seconds: 75),
+              ),
+              done: 'Summary added',
+            ),
+          ),
         if (timeline.isEmpty) const EmptyView('No history yet.'),
       ],
     );
@@ -267,43 +475,73 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     String? desk;
     final note = TextEditingController();
     DateTime? follow;
-    await showSheet(context, title: 'Hand off', builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
-          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            DeskPicker(groups: (t['handoff_options'] as List).cast<Json>(), value: desk, allowNone: false, label: 'Hand to', onChanged: (v) => set(() => desk = v)),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
-                label: const Text('Add someone new'),
-                onPressed: () async {
-                  final newDesk = await openAddHolder(ctx, (t['workspace'] as Json)['id'] as int);
-                  if (newDesk != null) {
-                    await _load();
-                    set(() => desk = newDesk);
-                  }
-                },
+    await showSheet(
+      context,
+      title: 'Hand off',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, set) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DeskPicker(
+                groups: (t['handoff_options'] as List).cast<Json>(),
+                value: desk,
+                allowNone: false,
+                label: 'Hand to',
+                onChanged: (v) => set(() => desk = v),
               ),
-            ),
-            const SizedBox(height: 4),
-            TextField(controller: note, maxLines: 3, minLines: 1, decoration: const InputDecoration(labelText: 'Note (optional)')),
-            const SizedBox(height: 12),
-            DateField(label: 'Follow up on (optional)', value: follow, onChanged: (v) => set(() => follow = v)),
-            const SizedBox(height: 18),
-            FilledButton(
-              onPressed: desk == null
-                  ? null
-                  : () async {
-                      final ok = await _act((api) => api.post('tasks/${t['id']}/handoff', {
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
+                  label: const Text('Add someone new'),
+                  onPressed: () async {
+                    final newDesk = await openAddHolder(
+                      ctx,
+                      (t['workspace'] as Json)['id'] as int,
+                    );
+                    if (newDesk != null) {
+                      await _load();
+                      set(() => desk = newDesk);
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(height: 4),
+              TextField(
+                controller: note,
+                maxLines: 3,
+                minLines: 1,
+                decoration: const InputDecoration(labelText: 'Note (optional)'),
+              ),
+              const SizedBox(height: 12),
+              DateField(
+                label: 'Follow up on (optional)',
+                value: follow,
+                onChanged: (v) => set(() => follow = v),
+              ),
+              const SizedBox(height: 18),
+              FilledButton(
+                onPressed: desk == null
+                    ? null
+                    : () async {
+                        final ok = await _act(
+                          (api) => api.post('tasks/${t['id']}/handoff', {
                             'to_holder': desk,
                             'note': note.text,
-                            if (follow != null) 'follow_up_date': isoDate(follow!),
-                          }));
-                      if (ok && ctx.mounted) Navigator.pop(ctx);
-                    },
-              child: const Text('Record hand-off'),
-            ),
-          ]);
-        }));
+                            if (follow != null)
+                              'follow_up_date': isoDate(follow!),
+                          }),
+                        );
+                        if (ok && ctx.mounted) Navigator.pop(ctx);
+                      },
+                child: const Text('Record hand-off'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _addUpdate(Json t) async {
@@ -311,83 +549,185 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     String kind = 'note';
     final body = TextEditingController();
     final source = TextEditingController();
-    await showSheet(context, title: 'Add update', builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
-          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final k in app.option('update_kinds'))
-                ChoiceChip(label: Text(k['label'] as String), selected: kind == k['value'], showCheckmark: false, onSelected: (_) => set(() => kind = k['value'] as String)),
-            ]),
-            const SizedBox(height: 14),
-            TextField(controller: body, autofocus: true, maxLines: 8, minLines: 3, decoration: const InputDecoration(labelText: 'What happened / paste the message', alignLabelWithHint: true)),
-            const SizedBox(height: 12),
-            TextField(controller: source, decoration: const InputDecoration(labelText: 'From (optional)')),
-            const SizedBox(height: 18),
-            FilledButton(
-              onPressed: () async {
-                if (body.text.trim().isEmpty) return toast(ctx, 'Write something first.', error: true);
-                final ok = await _act((api) => api.post('tasks/${t['id']}/updates', {'kind': kind, 'body': body.text, 'source': source.text}));
-                if (ok && ctx.mounted) Navigator.pop(ctx);
-              },
-              child: const Text('Add to timeline'),
-            ),
-          ]);
-        }));
+    await showSheet(
+      context,
+      title: 'Add update',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, set) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final k in app.option('update_kinds'))
+                    ChoiceChip(
+                      label: Text(k['label'] as String),
+                      selected: kind == k['value'],
+                      showCheckmark: false,
+                      onSelected: (_) => set(() => kind = k['value'] as String),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: body,
+                autofocus: true,
+                maxLines: 8,
+                minLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'What happened / paste the message',
+                  alignLabelWithHint: true,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: source,
+                decoration: const InputDecoration(labelText: 'From (optional)'),
+              ),
+              const SizedBox(height: 18),
+              FilledButton(
+                onPressed: () async {
+                  if (body.text.trim().isEmpty) {
+                    return toast(ctx, 'Write something first.', error: true);
+                  }
+                  final ok = await _act(
+                    (api) => api.post('tasks/${t['id']}/updates', {
+                      'kind': kind,
+                      'body': body.text,
+                      'source': source.text,
+                    }),
+                  );
+                  if (ok && ctx.mounted) Navigator.pop(ctx);
+                },
+                child: const Text('Add to timeline'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _stage(Json t) async {
     final current = (t['stage'] as Json)['id'];
     final note = TextEditingController();
-    await showSheet(context, title: 'Move to stage', builder: (ctx) {
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        for (final s in (t['stages'] as List).cast<Json>())
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(s['id'] == current ? Icons.radio_button_checked : (s['closed'] == true ? Icons.check_circle_outline : Icons.radio_button_unchecked),
-                color: s['id'] == current ? Theme.of(ctx).colorScheme.primary : null),
-            title: Text(s['name'] as String),
-            subtitle: s['closed'] == true ? const Text('Closes the task') : null,
-            enabled: s['id'] != current,
-            onTap: () async {
-              final ok = await _act((api) => api.post('tasks/${t['id']}/stage', {'stage': s['id'], 'note': note.text}));
-              if (ok && ctx.mounted) Navigator.pop(ctx);
-            },
-          ),
-        const SizedBox(height: 8),
-        TextField(controller: note, decoration: const InputDecoration(labelText: 'Note (optional)')),
-      ]);
-    });
+    await showSheet(
+      context,
+      title: 'Move to stage',
+      builder: (ctx) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final s in (t['stages'] as List).cast<Json>())
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  s['id'] == current
+                      ? Icons.radio_button_checked
+                      : (s['closed'] == true
+                            ? Icons.check_circle_outline
+                            : Icons.radio_button_unchecked),
+                  color: s['id'] == current
+                      ? Theme.of(ctx).colorScheme.primary
+                      : null,
+                ),
+                title: Text(s['name'] as String),
+                subtitle: s['closed'] == true
+                    ? const Text('Closes the task')
+                    : null,
+                enabled: s['id'] != current,
+                onTap: () async {
+                  final ok = await _act(
+                    (api) => api.post('tasks/${t['id']}/stage', {
+                      'stage': s['id'],
+                      'note': note.text,
+                    }),
+                  );
+                  if (ok && ctx.mounted) Navigator.pop(ctx);
+                },
+              ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: note,
+              decoration: const InputDecoration(labelText: 'Note (optional)'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _followUp(Json t) async {
-    DateTime? date = t['follow_up_date'] == null ? null : DateTime.parse(t['follow_up_date'] as String);
+    DateTime? date = t['follow_up_date'] == null
+        ? null
+        : DateTime.parse(t['follow_up_date'] as String);
     final note = TextEditingController(text: t['follow_up_note'] as String);
-    await showSheet(context, title: 'Follow-up', builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
-          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Wrap(spacing: 8, children: [
-              for (final p in const [('Tomorrow', 1), ('In 3 days', 3), ('Next week', 7)])
-                ActionChip(label: Text(p.$1), onPressed: () => set(() => date = DateTime.now().add(Duration(days: p.$2)))),
-            ]),
-            const SizedBox(height: 12),
-            DateField(label: 'Follow up on', value: date, onChanged: (v) => set(() => date = v)),
-            const SizedBox(height: 12),
-            TextField(controller: note, decoration: const InputDecoration(labelText: 'What to check')),
-            const SizedBox(height: 18),
-            FilledButton(
-              onPressed: () async {
-                final ok = await _act((api) => api.post('tasks/${t['id']}/follow-up', {
+    await showSheet(
+      context,
+      title: 'Follow-up',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, set) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final p in const [
+                    ('Tomorrow', 1),
+                    ('In 3 days', 3),
+                    ('Next week', 7),
+                  ])
+                    ActionChip(
+                      label: Text(p.$1),
+                      onPressed: () => set(
+                        () => date = DateTime.now().add(Duration(days: p.$2)),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              DateField(
+                label: 'Follow up on',
+                value: date,
+                onChanged: (v) => set(() => date = v),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: note,
+                decoration: const InputDecoration(labelText: 'What to check'),
+              ),
+              const SizedBox(height: 18),
+              FilledButton(
+                onPressed: () async {
+                  final ok = await _act(
+                    (api) => api.post('tasks/${t['id']}/follow-up', {
                       'follow_up_date': date == null ? '' : isoDate(date!),
                       'follow_up_note': note.text,
-                    }));
-                if (ok && ctx.mounted) Navigator.pop(ctx);
-              },
-              child: Text(date == null ? 'Clear follow-up' : 'Save follow-up'),
-            ),
-          ]);
-        }));
+                    }),
+                  );
+                  if (ok && ctx.mounted) Navigator.pop(ctx);
+                },
+                child: Text(
+                  date == null ? 'Clear follow-up' : 'Save follow-up',
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _edit(Json t) async {
-    final changed = await Navigator.of(context).push<bool>(MaterialPageRoute(fullscreenDialog: true, builder: (_) => TaskFormScreen(task: t)));
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => TaskFormScreen(task: t),
+      ),
+    );
     if (changed == true) _load();
   }
 
@@ -396,10 +736,19 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('Delete this task?'),
-        content: const Text('Its whole timeline is removed too. This can’t be undone.'),
+        content: const Text(
+          'Its whole timeline is removed too. This can’t be undone.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-          FilledButton(style: FilledButton.styleFrom(backgroundColor: Tones.red(context)), onPressed: () => Navigator.pop(c, true), child: const Text('Delete')),
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Tones.red(context)),
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Delete'),
+          ),
         ],
       ),
     );
@@ -419,7 +768,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 }
 
 class _TimelineEntry extends StatelessWidget {
-  const _TimelineEntry(this.u, {required this.last, required this.canAi, required this.onSummarize});
+  const _TimelineEntry(
+    this.u, {
+    required this.last,
+    required this.canAi,
+    required this.onSummarize,
+  });
   final Json u;
   final bool last;
   final bool canAi;
@@ -446,65 +800,123 @@ class _TimelineEntry extends StatelessWidget {
     final summary = u['summary'] as String;
     final body = u['body'] as String;
     return IntrinsicHeight(
-      child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        SizedBox(
-          width: 22,
-          child: Column(children: [
-            const SizedBox(height: 5),
-            Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: kind == 'handoff' ? color : Colors.transparent,
-                  border: Border.all(color: color, width: 2)),
-            ),
-            if (!last) Expanded(child: Container(width: 2, color: cs.outlineVariant)),
-          ]),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 18),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Text(u['kind_label'] as String, style: const TextStyle(fontWeight: FontWeight.w700)),
-                const SizedBox(width: 8),
-                Text(fmtDateTime(u['occurred_at'] as String?), style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-              ]),
-              if (moveText != null) Padding(padding: const EdgeInsets.only(top: 3), child: Text(moveText)),
-              if ((u['source'] as String).isNotEmpty) Text('From: ${u['source']}', style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
-              if (summary.isNotEmpty)
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 22,
+            child: Column(
+              children: [
+                const SizedBox(height: 5),
                 Container(
-                  margin: const EdgeInsets.only(top: 6),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: Theme.of(context).cardTheme.color, borderRadius: BorderRadius.circular(12), border: Border.all(color: cs.outlineVariant)),
-                  child: Text(summary),
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: kind == 'handoff' ? color : Colors.transparent,
+                    border: Border.all(color: color, width: 2),
+                  ),
                 ),
-              if (body.isNotEmpty)
-                summary.isNotEmpty || body.length > 300
-                    ? Theme(
-                        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                        child: ExpansionTile(
-                          tilePadding: EdgeInsets.zero,
-                          dense: true,
-                          visualDensity: VisualDensity.compact,
-                          title: Text(summary.isNotEmpty ? 'Original text' : 'Show full text', style: TextStyle(color: cs.primary, fontSize: 13.5)),
-                          children: [Align(alignment: Alignment.centerLeft, child: SelectableText(body))],
-                        ),
-                      )
-                    : Padding(padding: const EdgeInsets.only(top: 4), child: SelectableText(body)),
-              if (canAi && u['can_summarize'] == true)
-                TextButton.icon(
-                  style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
-                  icon: const Icon(Icons.auto_awesome, size: 16),
-                  label: const Text('Summarize'),
-                  onPressed: () => onSummarize(u['id'] as int),
-                ),
-            ]),
+                if (!last)
+                  Expanded(
+                    child: Container(width: 2, color: cs.outlineVariant),
+                  ),
+              ],
+            ),
           ),
-        ),
-      ]),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        u['kind_label'] as String,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        fmtDateTime(u['occurred_at'] as String?),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (moveText != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Text(moveText),
+                    ),
+                  if ((u['source'] as String).isNotEmpty)
+                    Text(
+                      'From: ${u['source']}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  if (summary.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(top: 6),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardTheme.color,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: cs.outlineVariant),
+                      ),
+                      child: Text(summary),
+                    ),
+                  if (body.isNotEmpty)
+                    summary.isNotEmpty || body.length > 300
+                        ? Theme(
+                            data: Theme.of(context)
+                                .copyWith(dividerColor: Colors.transparent),
+                            child: ExpansionTile(
+                              tilePadding: EdgeInsets.zero,
+                              dense: true,
+                              visualDensity: VisualDensity.compact,
+                              title: Text(
+                                summary.isNotEmpty
+                                    ? 'Original text'
+                                    : 'Show full text',
+                                style: TextStyle(
+                                  color: cs.primary,
+                                  fontSize: 13.5,
+                                ),
+                              ),
+                              children: [
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: SelectableText(body),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: SelectableText(body),
+                          ),
+                  if (canAi && u['can_summarize'] == true)
+                    TextButton.icon(
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      icon: const Icon(Icons.auto_awesome, size: 16),
+                      label: const Text('Summarize'),
+                      onPressed: () => onSummarize(u['id'] as int),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -550,10 +962,19 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       _fuNote.text = t['follow_up_note'] as String;
       _role = t['my_role'] as String;
       _priority = t['priority'] as int;
-      _due = t['due_date'] == null ? null : DateTime.parse(t['due_date'] as String);
-      _follow = t['follow_up_date'] == null ? null : DateTime.parse(t['follow_up_date'] as String);
+      _due = t['due_date'] == null
+          ? null
+          : DateTime.parse(t['due_date'] as String);
+      _follow = t['follow_up_date'] == null
+          ? null
+          : DateTime.parse(t['follow_up_date'] as String);
     } else {
-      _ws = widget.workspaceId ?? app.workspaceFilter ?? (app.workspaces.isNotEmpty ? app.workspaces.first['id'] as int : null);
+      _ws =
+          widget.workspaceId ??
+          app.workspaceFilter ??
+          (app.workspaces.isNotEmpty
+              ? app.workspaces.first['id'] as int
+              : null);
       _loadDesks();
     }
   }
@@ -568,7 +989,10 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
 
   Future<void> _save() async {
     FocusScope.of(context).unfocus();
-    setState(() { _busy = true; _err = null; });
+    setState(() {
+      _busy = true;
+      _err = null;
+    });
     final app = AppScope.read(context);
     final data = <String, dynamic>{
       'title': _title.text.trim(),
@@ -591,7 +1015,12 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         app.changed();
         if (!mounted) return;
         HapticFeedback.mediumImpact();
-        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => TaskDetailScreen(id: (r['task'] as Json)['id'] as int)));
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) =>
+                TaskDetailScreen(id: (r['task'] as Json)['id'] as int),
+          ),
+        );
         return;
       }
       app.changed();
@@ -615,85 +1044,167 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
-            child: FilledButton(onPressed: _busy ? null : _save, child: Text(_editing ? 'Save' : 'Create')),
+            child: FilledButton(
+              onPressed: _busy ? null : _save,
+              child: Text(_editing ? 'Save' : 'Create'),
+            ),
           ),
         ],
       ),
-      body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 40), children: [
-        if (!_editing && app.workspaces.length > 1) ...[
-          Wrap(spacing: 8, children: [
-            for (final w in app.workspaces)
-              ChoiceChip(
-                showCheckmark: false,
-                selected: _ws == w['id'],
-                label: Row(mainAxisSize: MainAxisSize.min, children: [Dot(workspaceColor(w['color'] as String?, b)), const SizedBox(width: 6), Text(w['name'] as String)]),
-                onSelected: (_) => setState(() {
-                  _ws = w['id'] as int;
-                  _desk = null;
-                  _loadDesks();
-                }),
-              ),
-          ]),
-          gap,
-        ],
-        TextField(controller: _title, autofocus: !_editing, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(labelText: 'Title', errorText: fieldError(_err, 'title'))),
-        gap,
-        TextField(controller: _desc, maxLines: 4, minLines: 1, textCapitalization: TextCapitalization.sentences, decoration: const InputDecoration(labelText: 'Description (optional)')),
-        gap,
-        Text('My role', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-        const SizedBox(height: 6),
-        SegmentedButton<String>(
-          showSelectedIcon: false,
-          segments: const [
-            ButtonSegment(value: 'assigned', label: Text('Assigned')),
-            ButtonSegment(value: 'following', label: Text('Following')),
-            ButtonSegment(value: 'executing', label: Text('Doing it')),
-          ],
-          selected: {_role},
-          onSelectionChanged: (s) => setState(() => _role = s.first),
-        ),
-        gap,
-        if (!_editing)
-          AnimatedSize(
-            duration: const Duration(milliseconds: 200),
-            child: _role == 'executing'
-                ? const SizedBox(width: double.infinity)
-                : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    DeskPicker(groups: _desks, value: _desk, label: 'Currently with', onChanged: (v) => setState(() => _desk = v)),
-                    TextButton.icon(
-                      icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
-                      label: const Text('Add someone new'),
-                      onPressed: _ws == null
-                          ? null
-                          : () async {
-                              final d = await openAddHolder(context, _ws!);
-                              if (d != null) {
-                                await _loadDesks();
-                                setState(() => _desk = d);
-                              }
-                            },
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+        children: [
+          if (!_editing && app.workspaces.length > 1) ...[
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final w in app.workspaces)
+                  ChoiceChip(
+                    showCheckmark: false,
+                    selected: _ws == w['id'],
+                    label: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Dot(workspaceColor(w['color'] as String?, b)),
+                        const SizedBox(width: 6),
+                        Text(w['name'] as String),
+                      ],
                     ),
-                    const SizedBox(height: 6),
-                  ]),
+                    onSelected: (_) => setState(() {
+                      _ws = w['id'] as int;
+                      _desk = null;
+                      _loadDesks();
+                    }),
+                  ),
+              ],
+            ),
+            gap,
+          ],
+          TextField(
+            controller: _title,
+            autofocus: !_editing,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+              labelText: 'Title',
+              errorText: fieldError(_err, 'title'),
+            ),
           ),
-        DropdownButtonFormField<int>(
-          initialValue: _priority,
-          decoration: const InputDecoration(labelText: 'Priority'),
-          items: [for (final p in app.option('priorities')) DropdownMenuItem(value: p['value'] as int, child: Text(p['label'] as String))],
-          onChanged: (v) => setState(() => _priority = v ?? 2),
-        ),
-        gap,
-        DateField(label: 'Due date', value: _due, onChanged: (v) => setState(() => _due = v)),
-        gap,
-        DateField(label: 'Follow up on', value: _follow, onChanged: (v) => setState(() => _follow = v)),
-        if (_follow != null) ...[gap, TextField(controller: _fuNote, decoration: const InputDecoration(labelText: 'What to check'))],
-        gap,
-        TextField(controller: _ref, decoration: const InputDecoration(labelText: 'Reference no. (optional)')),
-        if (!_editing) ...[
           gap,
-          TextField(controller: _note, maxLines: 4, minLines: 2, decoration: const InputDecoration(labelText: 'Background / first note (optional)', alignLabelWithHint: true)),
+          TextField(
+            controller: _desc,
+            maxLines: 4,
+            minLines: 1,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(
+              labelText: 'Description (optional)',
+            ),
+          ),
+          gap,
+          Text(
+            'My role',
+            style: TextStyle(
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 6),
+          SegmentedButton<String>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(value: 'assigned', label: Text('Assigned')),
+              ButtonSegment(value: 'following', label: Text('Following')),
+              ButtonSegment(value: 'executing', label: Text('Doing it')),
+            ],
+            selected: {_role},
+            onSelectionChanged: (s) => setState(() => _role = s.first),
+          ),
+          gap,
+          if (!_editing)
+            AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              child: _role == 'executing'
+                  ? const SizedBox(width: double.infinity)
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        DeskPicker(
+                          groups: _desks,
+                          value: _desk,
+                          label: 'Currently with',
+                          onChanged: (v) => setState(() => _desk = v),
+                        ),
+                        TextButton.icon(
+                          icon: const Icon(
+                            Icons.person_add_alt_1_outlined,
+                            size: 18,
+                          ),
+                          label: const Text('Add someone new'),
+                          onPressed: _ws == null
+                              ? null
+                              : () async {
+                                  final d = await openAddHolder(context, _ws!);
+                                  if (d != null) {
+                                    await _loadDesks();
+                                    setState(() => _desk = d);
+                                  }
+                                },
+                        ),
+                        const SizedBox(height: 6),
+                      ],
+                    ),
+            ),
+          DropdownButtonFormField<int>(
+            initialValue: _priority,
+            decoration: const InputDecoration(labelText: 'Priority'),
+            items: [
+              for (final p in app.option('priorities'))
+                DropdownMenuItem(
+                  value: p['value'] as int,
+                  child: Text(p['label'] as String),
+                ),
+            ],
+            onChanged: (v) => setState(() => _priority = v ?? 2),
+          ),
+          gap,
+          DateField(
+            label: 'Due date',
+            value: _due,
+            onChanged: (v) => setState(() => _due = v),
+          ),
+          gap,
+          DateField(
+            label: 'Follow up on',
+            value: _follow,
+            onChanged: (v) => setState(() => _follow = v),
+          ),
+          if (_follow != null) ...[
+            gap,
+            TextField(
+              controller: _fuNote,
+              decoration: const InputDecoration(labelText: 'What to check'),
+            ),
+          ],
+          gap,
+          TextField(
+            controller: _ref,
+            decoration: const InputDecoration(
+              labelText: 'Reference no. (optional)',
+            ),
+          ),
+          if (!_editing) ...[
+            gap,
+            TextField(
+              controller: _note,
+              maxLines: 4,
+              minLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Background / first note (optional)',
+                alignLabelWithHint: true,
+              ),
+            ),
+          ],
         ],
-      ]),
+      ),
     );
   }
 }

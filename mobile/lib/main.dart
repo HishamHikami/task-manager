@@ -19,49 +19,74 @@ void main() {
 
 ThemeData _theme(Brightness b) {
   final scheme = ColorScheme.fromSeed(seedColor: brand, brightness: b);
-  final base = ThemeData(colorScheme: scheme, useMaterial3: true, brightness: b);
+  final base = ThemeData(
+    colorScheme: scheme,
+    useMaterial3: true,
+    brightness: b,
+  );
   final dark = b == Brightness.dark;
   return base.copyWith(
-    scaffoldBackgroundColor: dark ? const Color(0xFF0E1319) : const Color(0xFFF5F6F8),
+    scaffoldBackgroundColor: dark
+        ? const Color(0xFF0E1319)
+        : const Color(0xFFF5F6F8),
     appBarTheme: AppBarTheme(
       backgroundColor: dark ? const Color(0xFF0E1319) : const Color(0xFFF5F6F8),
       surfaceTintColor: Colors.transparent,
       scrolledUnderElevation: 1,
       centerTitle: false,
-      titleTextStyle: base.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700, color: scheme.onSurface),
+      titleTextStyle: base.textTheme.titleLarge?.copyWith(
+        fontWeight: FontWeight.w700,
+        color: scheme.onSurface,
+      ),
     ),
     cardTheme: CardThemeData(
       elevation: 0,
       color: dark ? const Color(0xFF161D26) : Colors.white,
       shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: dark ? const Color(0xFF26303C) : const Color(0xFFE4E7EC))),
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: dark ? const Color(0xFF26303C) : const Color(0xFFE4E7EC),
+        ),
+      ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: dark ? const Color(0xFF161D26) : Colors.white,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: dark ? const Color(0xFF26303C) : const Color(0xFFDDE1E7))),
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: dark ? const Color(0xFF26303C) : const Color(0xFFDDE1E7),
+        ),
+      ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     ),
     navigationBarTheme: NavigationBarThemeData(
       height: 68,
       backgroundColor: dark ? const Color(0xFF161D26) : Colors.white,
       indicatorColor: scheme.primaryContainer,
-      labelTextStyle: WidgetStatePropertyAll(base.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+      labelTextStyle: WidgetStatePropertyAll(
+        base.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
+      ),
     ),
-    pageTransitionsTheme: const PageTransitionsTheme(builders: {
-      TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
-    }),
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {TargetPlatform.android: FadeForwardsPageTransitionsBuilder()},
+    ),
     filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-            minimumSize: const Size(0, 46), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(0, 46),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    ),
     outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-            minimumSize: const Size(0, 46), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
-    snackBarTheme: SnackBarThemeData(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(0, 46),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
   );
 }
 
@@ -78,10 +103,13 @@ class TasksApp extends StatelessWidget {
       home: AnimatedSwitcher(
         duration: const Duration(milliseconds: 350),
         child: app.loading
-            ? const Scaffold(key: ValueKey('splash'), body: Center(child: CircularProgressIndicator()))
+            ? const Scaffold(
+                key: ValueKey('splash'),
+                body: Center(child: CircularProgressIndicator()),
+              )
             : app.api == null
-                ? const LoginScreen(key: ValueKey('login'))
-                : const Shell(key: ValueKey('shell')),
+            ? const LoginScreen(key: ValueKey('login'))
+            : const Shell(key: ValueKey('shell')),
       ),
     );
   }
@@ -100,20 +128,40 @@ class _ShellState extends State<Shell> {
   final _keys = List.generate(5, (_) => GlobalKey<NavigatorState>());
 
   static const _destinations = [
-    NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'Home'),
-    NavigationDestination(icon: Icon(Icons.checklist_rounded), selectedIcon: Icon(Icons.checklist_rounded), label: 'Tasks'),
-    NavigationDestination(icon: Icon(Icons.bolt_outlined), selectedIcon: Icon(Icons.bolt), label: 'Capture'),
-    NavigationDestination(icon: Icon(Icons.event_outlined), selectedIcon: Icon(Icons.event), label: 'Events'),
-    NavigationDestination(icon: Icon(Icons.layers_outlined), selectedIcon: Icon(Icons.layers), label: 'Workspaces'),
+    NavigationDestination(
+      icon: Icon(Icons.home_outlined),
+      selectedIcon: Icon(Icons.home_rounded),
+      label: 'Home',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.checklist_rounded),
+      selectedIcon: Icon(Icons.checklist_rounded),
+      label: 'Tasks',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.bolt_outlined),
+      selectedIcon: Icon(Icons.bolt),
+      label: 'Capture',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.event_outlined),
+      selectedIcon: Icon(Icons.event),
+      label: 'Events',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.layers_outlined),
+      selectedIcon: Icon(Icons.layers),
+      label: 'Workspaces',
+    ),
   ];
 
   Widget _root(int i) => switch (i) {
-        0 => const DashboardScreen(),
-        1 => const TasksScreen(),
-        2 => const CaptureScreen(),
-        3 => const EventsScreen(),
-        _ => const WorkspacesScreen(),
-      };
+    0 => const DashboardScreen(),
+    1 => const TasksScreen(),
+    2 => const CaptureScreen(),
+    3 => const EventsScreen(),
+    _ => const WorkspacesScreen(),
+  };
 
   void _select(int i) {
     HapticFeedback.selectionClick();
@@ -150,16 +198,19 @@ class _ShellState extends State<Shell> {
         }
       },
       child: Scaffold(
-        body: Stack(children: [
-          for (var i = 0; i < 5; i++)
-            _FadeThroughTab(
-              active: i == _index,
-              child: Navigator(
-                key: _keys[i],
-                onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => _root(i)),
+        body: Stack(
+          children: [
+            for (var i = 0; i < 5; i++)
+              _FadeThroughTab(
+                active: i == _index,
+                child: Navigator(
+                  key: _keys[i],
+                  onGenerateRoute: (_) =>
+                      MaterialPageRoute(builder: (_) => _root(i)),
+                ),
               ),
-            ),
-        ]),
+          ],
+        ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: _index,
           onDestinationSelected: _select,
@@ -171,27 +222,55 @@ class _ShellState extends State<Shell> {
   }
 }
 
-/// Keeps a tab alive but invisible when not selected; fades and lifts it in when selected.
-class _FadeThroughTab extends StatelessWidget {
+/// Keeps a tab alive but hidden when not selected; fades and lifts it in when selected.
+/// The fade runs on this widget's own ticker, so pausing hidden tabs can't freeze it.
+class _FadeThroughTab extends StatefulWidget {
   const _FadeThroughTab({required this.active, required this.child});
   final bool active;
   final Widget child;
   @override
+  State<_FadeThroughTab> createState() => _FadeThroughTabState();
+}
+
+class _FadeThroughTabState extends State<_FadeThroughTab>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 240),
+    value: widget.active ? 1 : 0,
+  );
+  late final Animation<double> _fade = CurvedAnimation(
+    parent: _c,
+    curve: Curves.easeOut,
+  );
+  late final Animation<Offset> _slide = Tween(
+    begin: const Offset(0, .02),
+    end: Offset.zero,
+  ).animate(CurvedAnimation(parent: _c, curve: Curves.easeOutCubic));
+
+  @override
+  void didUpdateWidget(_FadeThroughTab old) {
+    super.didUpdateWidget(old);
+    if (widget.active && !old.active) _c.forward(from: 0);
+    if (!widget.active) _c.value = 0;
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return IgnorePointer(
-      ignoring: !active,
+    // Same widget shape whether active or not, so each tab keeps its state.
+    return Offstage(
+      offstage: !widget.active,
       child: TickerMode(
-        enabled: active,
-        child: AnimatedOpacity(
-          opacity: active ? 1 : 0,
-          duration: Duration(milliseconds: active ? 220 : 120),
-          curve: Curves.easeOut,
-          child: AnimatedSlide(
-            offset: active ? Offset.zero : const Offset(0, .015),
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeOutCubic,
-            child: Offstage(offstage: false, child: child),
-          ),
+        enabled: widget.active,
+        child: FadeTransition(
+          opacity: _fade,
+          child: SlideTransition(position: _slide, child: widget.child),
         ),
       ),
     );

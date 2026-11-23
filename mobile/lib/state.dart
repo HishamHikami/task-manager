@@ -18,7 +18,8 @@ class AppState extends ChangeNotifier {
   String? sharedText; // text shared into the app from another app
   int requestedTab = -1;
 
-  List<Json> get workspaces => ((boot?['workspaces'] as List?) ?? []).cast<Json>();
+  List<Json> get workspaces =>
+      ((boot?['workspaces'] as List?) ?? []).cast<Json>();
   bool get aiReady => boot?['ai_ready'] == true;
   List<Json> option(String key) => ((boot?[key] as List?) ?? []).cast<Json>();
 
@@ -47,7 +48,11 @@ class AppState extends ChangeNotifier {
   Future<void> login(String server, String username, String password) async {
     final base = ApiClient.normalizeServer(server);
     final client = ApiClient(baseUrl: base);
-    final r = await client.post('auth/login', {'username': username, 'password': password, 'device': 'Android app'});
+    final r = await client.post('auth/login', {
+      'username': username,
+      'password': password,
+      'device': 'Android app',
+    });
     client.token = r['token'] as String;
     boot = await client.get('bootstrap');
     api = client;
@@ -100,9 +105,12 @@ class AppState extends ChangeNotifier {
         _receiveShare(call.arguments as String);
       }
     });
-    _shareChannel.invokeMethod<String>('initial').then((t) {
-      if (t != null && t.isNotEmpty) _receiveShare(t);
-    }).catchError((_) {});
+    _shareChannel
+        .invokeMethod<String>('initial')
+        .then((t) {
+          if (t != null && t.isNotEmpty) _receiveShare(t);
+        })
+        .catchError((_) {});
   }
 
   void _receiveShare(String text) {
@@ -120,9 +128,13 @@ class AppState extends ChangeNotifier {
 
 /// Makes AppState available to the widget tree.
 class AppScope extends InheritedNotifier<AppState> {
-  const AppScope({super.key, required AppState state, required super.child}) : super(notifier: state);
+  const AppScope({super.key, required AppState state, required super.child})
+    : super(notifier: state);
 
-  static AppState of(BuildContext context) => context.dependOnInheritedWidgetOfExactType<AppScope>()!.notifier!;
+  static AppState of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<AppScope>()!.notifier!;
   static AppState read(BuildContext context) =>
-      (context.getElementForInheritedWidgetOfExactType<AppScope>()!.widget as AppScope).notifier!;
+      (context.getElementForInheritedWidgetOfExactType<AppScope>()!.widget
+              as AppScope)
+          .notifier!;
 }
