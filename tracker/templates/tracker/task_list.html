@@ -13,7 +13,7 @@
   </select>
   <select name="holder">
     <option value="">Anyone</option>
-    {% for h in holders %}<option value="{{ h.pk }}" {% if holder_id == h.pk|stringformat:'s' %}selected{% endif %}>{{ h.name }}{% if not workspace %} ({{ h.workspace.name }}){% endif %}</option>{% endfor %}
+    {% for h in holders %}<option value="{{ h.pk }}" {% if holder_id == h.pk|stringformat:'s' %}selected{% endif %}>{{ h.display_name }}{% if not workspace %} ({{ h.workspace.name }}){% endif %}</option>{% endfor %}
   </select>
   <select name="role">
     <option value="">Any role</option>

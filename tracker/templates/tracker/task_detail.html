@@ -12,7 +12,7 @@
   <h1>{{ task.title }}</h1>
   {% if task.description %}<p class="desc">{{ task.description|linebreaksbr }}</p>{% endif %}
   <dl class="facts">
-    <div><dt>Currently with</dt><dd>{% if task.current_holder %}<strong>{{ task.current_holder.name }}</strong> <span class="muted">for {{ task.days_with_holder }} day{{ task.days_with_holder|pluralize }}</span>{% else %}<span class="muted">Nobody yet</span>{% endif %}</dd></div>
+    <div><dt>Currently with</dt><dd>{% if task.current_holder %}<strong>{{ task.current_holder.display_name }}</strong>{% if task.current_holder.contact %} <span class="muted">· {{ task.current_holder.contact }}</span>{% endif %} <span class="muted">for {{ task.days_with_holder }} day{{ task.days_with_holder|pluralize }}</span>{% else %}<span class="muted">Nobody yet</span>{% endif %}</dd></div>
     <div><dt>Due</dt><dd>{% if task.due_date %}<span class="{% if task.is_overdue %}text-red{% endif %}">{{ task.due_date|date:"D d M Y" }}</span>{% else %}—{% endif %}</dd></div>
     <div><dt>Follow up</dt><dd>{% if task.follow_up_date %}<span class="{% if task.follow_up_due %}text-amber{% endif %}">{{ task.follow_up_date|date:"D d M Y" }}</span>{% if task.follow_up_note %} · {{ task.follow_up_note }}{% endif %}{% else %}—{% endif %}</dd></div>
     {% if task.reference %}<div><dt>Reference</dt><dd>{{ task.reference }}</dd></div>{% endif %}
@@ -64,11 +64,11 @@
       <time datetime="{{ u.occurred_at|date:'c' }}">{{ u.occurred_at|date:"D d M Y, H:i" }}</time>
     </div>
     {% if u.kind == 'handoff' %}
-      <p class="tl-move">{{ u.from_holder.name|default:"Nobody" }} <span class="arrow">→</span> <strong>{{ u.to_holder.name|default:"Nobody" }}</strong></p>
+      <p class="tl-move">{{ u.from_holder.display_name|default:"Nobody" }} <span class="arrow">→</span> <strong>{{ u.to_holder.display_name|default:"Nobody" }}</strong></p>
     {% elif u.kind == 'stage' %}
       <p class="tl-move">{{ u.from_stage.name|default:"—" }} <span class="arrow">→</span> <strong>{{ u.to_stage.name|default:"—" }}</strong></p>
     {% elif u.kind == 'created' %}
-      <p class="tl-move">Registered in <strong>{{ u.to_stage.name|default:"—" }}</strong>{% if u.to_holder %}, with <strong>{{ u.to_holder.name }}</strong>{% endif %}</p>
+      <p class="tl-move">Registered in <strong>{{ u.to_stage.name|default:"—" }}</strong>{% if u.to_holder %}, with <strong>{{ u.to_holder.display_name }}</strong>{% endif %}</p>
     {% endif %}
     {% if u.source %}<p class="tl-source">From: {{ u.source }}</p>{% endif %}
     {% if u.summary %}<p class="tl-summary">{{ u.summary|linebreaksbr }}</p>{% endif %}

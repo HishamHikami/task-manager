@@ -228,3 +228,4 @@ table.list form { margin: 0; }
   .container { padding: 12px; }
   h1 { font-size: 1.25rem; }
 }
+.field[hidden] { display: none; }

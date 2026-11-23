@@ -111,9 +111,9 @@ def dashboard(request):
             -t.priority,
         ),
     ):
-        label = task.current_holder.name if task.current_holder else "Not assigned to anyone"
+        label = task.current_holder.display_name if task.current_holder else "Not assigned to anyone"
         if not workspace and task.current_holder:
-            label = f"{task.current_holder.name} · {task.workspace.name}"
+            label = f"{label} · {task.workspace.name}"
         by_holder.setdefault(label, []).append(task)
 
     recent = (

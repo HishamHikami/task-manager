@@ -7,6 +7,7 @@
   <title>{% block title %}Tasks{% endblock %} · Task Manager</title>
   <link rel="stylesheet" href="{% static 'tracker/app.css' %}">
   <script src="{% static 'tracker/htmx.min.js' %}" defer></script>
+  <script src="{% static 'tracker/app.js' %}" defer></script>
 </head>
 <body hx-boost="true" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 {% if user.is_authenticated %}

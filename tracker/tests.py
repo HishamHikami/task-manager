@@ -143,3 +143,29 @@ class AdminLoginTests(TestCase):
     def test_admin_index_redirects_anonymous_to_login(self):
         resp = self.client.get("/admin/", follow=True)
         self.assertEqual(resp.request["PATH_INFO"], "/login/")
+
+
+class ContactPersonTests(BaseCase):
+    def test_display_name_for_groups_only(self):
+        self.finance.contact_person = "Sara"
+        self.finance.save()
+        self.assertEqual(self.finance.display_name, "Finance (Sara)")
+        person = Holder.objects.create(workspace=self.ws, name="Omar", kind="person", contact_person="ignored")
+        self.assertEqual(person.display_name, "Omar")
+
+    def test_new_holder_with_contact_person_from_handoff(self):
+        task = self.make_task()
+        self.client.post(reverse("task_handoff", args=[task.pk]),
+                         {"new_holder": "Legal", "new_holder_kind": "department",
+                          "new_holder_contact_person": "Mr. Khalid"})
+        task.refresh_from_db()
+        self.assertEqual(task.current_holder.name, "Legal")
+        self.assertEqual(task.current_holder.contact_person, "Mr. Khalid")
+        resp = self.client.get(task.get_absolute_url())
+        self.assertContains(resp, "Legal (Mr. Khalid)")
+
+    def test_holder_form_saves_contact_person(self):
+        self.client.post(reverse("holder_create", args=[self.ws.pk]),
+                         {"name": "Events Committee", "kind": "committee", "contact_person": "Br. Ali",
+                          "active": "on"})
+        self.assertEqual(Holder.objects.get(name="Events Committee").contact_person, "Br. Ali")

@@ -87,8 +87,19 @@ class Holder(models.Model):
 
     workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name="holders")
     name = models.CharField(max_length=120)
-    kind = models.CharField(max_length=12, choices=KIND_CHOICES, default="person")
-    contact = models.CharField(max_length=200, blank=True, help_text="Phone, email or extension.")
+    # Kinds that are a group or organization rather than one person.
+    GROUP_KINDS = ["department", "committee", "external"]
+
+    kind = models.CharField("Type", max_length=12, choices=KIND_CHOICES, default="person")
+    contact_person = models.CharField(
+        "Point of contact",
+        max_length=120,
+        blank=True,
+        help_text="The person you deal with there, e.g. the department head or committee lead.",
+    )
+    contact = models.CharField(
+        "Phone / email", max_length=200, blank=True, help_text="Phone, email or extension."
+    )
     notes = models.TextField(blank=True)
     active = models.BooleanField(default=True)
 
@@ -99,6 +110,17 @@ class Holder(models.Model):
         ]
 
     def __str__(self):
+        return self.name
+
+    @property
+    def is_group(self):
+        return self.kind in self.GROUP_KINDS
+
+    @property
+    def display_name(self):
+        """"Finance (Sara)" for a group with a point of contact, else just the name."""
+        if self.is_group and self.contact_person:
+            return f"{self.name} ({self.contact_person})"
         return self.name
 
 
