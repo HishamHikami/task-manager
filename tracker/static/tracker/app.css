@@ -323,3 +323,4 @@ fieldset.choose legend { font-weight: 600; font-size: .9rem; margin-bottom: 6px;
 .help-box ol { padding-left: 20px; }
 .mt { margin-top: 22px; }
 .plainlist { padding-left: 18px; }
+.small { font-size: .85rem; }

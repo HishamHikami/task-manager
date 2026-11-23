@@ -5,7 +5,8 @@
   <h1>Settings</h1>
 
   <h2>AI summaries</h2>
-  <p class="muted">Uses your own Anthropic API key. It's stored encrypted on this server and only used for the summaries you ask for. Anyone else running a copy of this app uses their own key.</p>
+  <p class="muted">Uses your own Anthropic API key, only for the summaries you ask for. Anyone else running a copy of this app uses their own key.</p>
+  <p class="muted small">How it's stored: encrypted in the database with a secret from the server's settings file. That keeps it unreadable in database backups and copies, but anyone with full (root) access to the server could still recover it — so also set a monthly spend limit in the Anthropic Console, and remove or rotate the key there if the server is ever compromised.</p>
   <p>Key: {% if s.has_api_key %}<strong>saved</strong> <span class="muted">({{ s.anthropic_key_hint }})</span>{% else %}<strong>not set</strong>{% endif %}</p>
   <form method="post">
     {% csrf_token %}
