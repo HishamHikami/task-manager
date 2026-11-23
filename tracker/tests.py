@@ -243,7 +243,7 @@ class AddHolderFromTaskTests(BaseCase):
         omar = Holder.objects.get(name="Omar")
         self.assertRedirects(resp, f"{back}?holder={omar.pk}", fetch_redirect_response=False)
         page = self.client.get(f"{back}?holder={omar.pk}")
-        self.assertContains(page, f'<option value="{omar.pk}" selected>')
+        self.assertContains(page, f'<option value="h{omar.pk}" selected>')
 
     def test_department_goes_via_people_page_then_back(self):
         back = reverse("task_create", args=[self.ws.pk])
@@ -257,14 +257,16 @@ class AddHolderFromTaskTests(BaseCase):
                                 {"name": "Khalid", "role": "Legal Manager", "active": "on"})
         self.assertRedirects(resp, people_page, fetch_redirect_response=False)
         page = self.client.get(people_page)
-        self.assertContains(page, "Use Legal for the task")
+        self.assertContains(page, "Use whole Legal")
+        khalid = Contact.objects.get(name="Khalid")
+        self.assertContains(page, f"{back}?contact={khalid.pk}")
         self.assertContains(page, f"{back}?holder={legal.pk}")
 
     def test_handoff_returns_with_panel_open_and_holder_selected(self):
         task = self.make_task()
         page = self.client.get(f"{task.get_absolute_url()}?holder={self.gm.pk}")
         self.assertContains(page, '<details class="panel" open>')
-        self.assertContains(page, f'<option value="{self.gm.pk}" selected>')
+        self.assertContains(page, f'<option value="h{self.gm.pk}" selected>')
 
     def test_external_next_is_ignored(self):
         resp = self.client.post(reverse("holder_create", args=[self.ws.pk]) + "?next=https://evil.example/",
@@ -392,13 +394,96 @@ class PersonIntoDepartmentTests(BaseCase):
         self.client.post(self.url, {"name": "Ali", "kind": "person", "department": self.gm.pk, "active": "on"})
         self.assertTrue(self.gm.contacts.filter(name="Ali").exists())
 
-    def test_from_task_returns_via_department_page(self):
+    def test_from_task_returns_straight_back_with_person_selected(self):
         back = reverse("task_create", args=[self.ws.pk])
         resp = self.client.post(self.url + "?next=" + back,
                                 {"name": "Sara", "kind": "person", "department": self.finance.pk, "active": "on"})
-        self.assertRedirects(resp, f"{self.finance.get_absolute_url()}?next={back.replace('/', '%2F')}",
-                             fetch_redirect_response=False)
+        sara = self.finance.contacts.get(name="Sara")
+        self.assertRedirects(resp, f"{back}?contact={sara.pk}", fetch_redirect_response=False)
+        page = self.client.get(f"{back}?contact={sara.pk}")
+        self.assertContains(page, f'<option value="c{sara.pk}" selected>')
 
     def test_edit_form_has_no_department_field(self):
         page = self.client.get(reverse("holder_edit", args=[self.finance.pk]))
         self.assertNotContains(page, 'name="department"')
+
+
+class AssignToPersonTests(BaseCase):
+    def setUp(self):
+        super().setUp()
+        self.sara = Contact.objects.create(holder=self.finance, name="Sara", role="Finance Manager",
+                                           is_primary=True, email="sara@example.com")
+        self.ahmed = Contact.objects.create(holder=self.finance, name="Ahmed", role="Accountant",
+                                            phone="+966 50 000 0000")
+
+    def create(self, desk):
+        self.client.post(reverse("task_create", args=[self.ws.pk]),
+                         {"title": "Pay invoice", "my_role": "following", "priority": 2,
+                          "stage": self.ws.first_open_stage().pk, "current_holder": desk})
+        return Task.objects.get(title="Pay invoice")
+
+    def test_picker_groups_people_under_departments(self):
+        page = self.client.get(reverse("task_create", args=[self.ws.pk])).content.decode()
+        block = page.split('<optgroup label="Finance">')[1].split("</optgroup>")[0]
+        self.assertIn("Finance — whole department", block)
+        self.assertIn(f'value="c{self.ahmed.pk}"', block)
+        self.assertIn("Ahmed · Accountant", block)
+        self.assertIn("Sara · Finance Manager ★", block)
+
+    def test_assign_to_specific_person(self):
+        task = self.create(f"c{self.ahmed.pk}")
+        self.assertEqual((task.current_holder, task.current_contact), (self.finance, self.ahmed))
+        self.assertEqual(task.desk_name, "Ahmed · Finance")
+        page = self.client.get(task.get_absolute_url())
+        self.assertContains(page, "Ahmed · Finance")
+        self.assertContains(page, 'data-copy="+966 50 000 0000"')  # Ahmed's phone, not Sara's
+        self.assertNotIn("sara@example.com", page.content.decode().split("People at")[0])
+
+    def test_whole_department_shows_main_contact(self):
+        task = self.create(f"h{self.finance.pk}")
+        self.assertIsNone(task.current_contact)
+        self.assertEqual(task.desk_name, "Finance (Sara)")
+
+    def test_handoff_between_people_in_same_department(self):
+        task = self.create(f"c{self.sara.pk}")
+        self.client.post(reverse("task_handoff", args=[task.pk]), {"to_holder": f"c{self.ahmed.pk}"})
+        task.refresh_from_db()
+        self.assertEqual(task.current_contact, self.ahmed)
+        entry = task.updates.get(kind="handoff")
+        self.assertEqual((entry.from_desk, entry.to_desk), ("Sara · Finance", "Ahmed · Finance"))
+        page = self.client.get(task.get_absolute_url())
+        self.assertContains(page, 'Sara · Finance <span class="arrow">→</span> <strong>Ahmed · Finance</strong>')
+
+    def test_current_person_not_offered_as_handoff_target(self):
+        task = self.create(f"c{self.sara.pk}")
+        page = self.client.get(task.get_absolute_url()).content.decode()
+        handoff = page.split('name="to_holder"')[1].split("</select>")[0]
+        self.assertNotIn(f'value="c{self.sara.pk}"', handoff)
+        self.assertIn(f'value="c{self.ahmed.pk}"', handoff)
+        self.assertIn(f'value="h{self.finance.pk}"', handoff)
+
+    def test_dashboard_groups_by_person(self):
+        self.create(f"c{self.ahmed.pk}")
+        self.assertContains(self.client.get(reverse("dashboard")), "Ahmed · Finance")
+
+    def test_person_from_other_workspace_rejected(self):
+        other = Workspace.objects.create(name="Org")
+        stranger = Contact.objects.create(holder=Holder.objects.create(workspace=other, name="X",
+                                                                        kind="department"), name="Stranger")
+        resp = self.client.post(reverse("task_create", args=[self.ws.pk]),
+                                {"title": "Bad", "my_role": "following", "priority": 2,
+                                 "stage": self.ws.first_open_stage().pk, "current_holder": f"c{stranger.pk}"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(Task.objects.filter(title="Bad").exists())
+
+    def test_inactive_person_not_offered(self):
+        self.ahmed.active = False
+        self.ahmed.save()
+        page = self.client.get(reverse("task_create", args=[self.ws.pk]))
+        self.assertNotContains(page, f'value="c{self.ahmed.pk}"')
+
+    def test_deleting_person_falls_back_to_department(self):
+        task = self.create(f"c{self.ahmed.pk}")
+        self.ahmed.delete()
+        task.refresh_from_db()
+        self.assertEqual((task.current_holder, task.current_contact), (self.finance, None))

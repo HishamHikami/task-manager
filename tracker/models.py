@@ -211,6 +211,10 @@ class Task(models.Model):
     current_holder = models.ForeignKey(
         Holder, on_delete=models.SET_NULL, null=True, blank=True, related_name="tasks"
     )
+    # The specific person inside that department/committee, if known.
+    current_contact = models.ForeignKey(
+        "Contact", on_delete=models.SET_NULL, null=True, blank=True, related_name="tasks"
+    )
     due_date = models.DateField(null=True, blank=True)
     follow_up_date = models.DateField(null=True, blank=True)
     follow_up_note = models.CharField(max_length=200, blank=True)
@@ -260,6 +264,24 @@ class Task(models.Model):
     def days_with_holder(self):
         return (timezone.now() - self.holder_since).days
 
+    @property
+    def desk_name(self):
+        """Whose desk it's on: "Maysara · IT & Support", "IT & Support (Sara)" or "Omar"."""
+        return desk_label(self.current_holder, self.current_contact)
+
+    @property
+    def desk_person(self):
+        """The person to call about it: the assigned person, else the department's main contact."""
+        if self.current_contact_id:
+            return self.current_contact
+        return self.current_holder.primary_contact if self.current_holder_id else None
+
+
+def desk_label(holder, contact):
+    if contact:
+        return f"{contact.name} · {contact.holder.name}"
+    return holder.display_name if holder else ""
+
 
 class Update(models.Model):
     """One entry on a task's timeline."""
@@ -291,6 +313,12 @@ class Update(models.Model):
     to_holder = models.ForeignKey(
         Holder, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
+    from_contact = models.ForeignKey(
+        "Contact", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    to_contact = models.ForeignKey(
+        "Contact", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
     from_stage = models.ForeignKey(
         Stage, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
@@ -302,6 +330,14 @@ class Update(models.Model):
 
     class Meta:
         ordering = ["-occurred_at", "-pk"]
+
+    @property
+    def from_desk(self):
+        return desk_label(self.from_holder, self.from_contact)
+
+    @property
+    def to_desk(self):
+        return desk_label(self.to_holder, self.to_contact)
 
     def __str__(self):
         return f"{self.get_kind_display()} on {self.task}"

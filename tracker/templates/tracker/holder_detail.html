@@ -3,8 +3,8 @@
 {% block content %}
 {% if back_to_task_url %}
 <div class="flash flash-info backbar">
-  <span>Add the people who work at {{ holder.name }} if you like, then go back to your task.</span>
-  <a class="btn btn-primary" href="{{ back_to_task_url }}" hx-boost="false">✓ Use {{ holder.name }} for the task</a>
+  <span>Pick the person who has the task, or use the whole {{ holder.get_kind_display|lower }}. Add people first if they're missing.</span>
+  <a class="btn btn-primary" href="{{ back_to_task_url }}" hx-boost="false">✓ Use whole {{ holder.name }}</a>
 </div>
 {% endif %}
 <p class="crumbs"><a href="{{ workspace.get_absolute_url }}">{{ workspace.name }}</a> ›</p>
@@ -32,6 +32,7 @@
       {% if c.notes %}<small class="muted">{{ c.notes }}</small>{% endif %}
     </div>
     <div class="person-actions">
+      {% if back_to and c.active %}<a class="btn btn-small btn-primary" hx-boost="false" href="{{ back_to }}{% if '?' in back_to %}&amp;{% else %}?{% endif %}contact={{ c.pk }}">Use for the task</a>{% endif %}
       <a href="{% url 'contact_edit' c.pk %}">Edit</a>
       <form method="post" action="{% url 'contact_delete' c.pk %}" hx-confirm="Remove {{ c.name }}?">{% csrf_token %}<button class="linklike text-red" type="submit">Remove</button></form>
     </div>

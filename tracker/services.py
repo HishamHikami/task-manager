@@ -14,25 +14,29 @@ def record_created(task, note=""):
         kind="created",
         body=note,
         to_holder=task.current_holder,
+        to_contact=task.current_contact,
         to_stage=task.stage,
         occurred_at=task.created_at or timezone.now(),
     )
 
 
 @transaction.atomic
-def hand_off(task, to_holder, note="", occurred_at=None):
-    """Move the task to another holder's desk."""
+def hand_off(task, to_holder, note="", occurred_at=None, to_contact=None):
+    """Move the task to another desk: a department/person, optionally a specific person inside it."""
     occurred_at = occurred_at or timezone.now()
-    from_holder = task.current_holder
+    from_holder, from_contact = task.current_holder, task.current_contact
     task.current_holder = to_holder
+    task.current_contact = to_contact
     task.holder_since = occurred_at
-    task.save(update_fields=["current_holder", "holder_since", "updated_at"])
+    task.save(update_fields=["current_holder", "current_contact", "holder_since", "updated_at"])
     return Update.objects.create(
         task=task,
         kind="handoff",
         body=note,
         from_holder=from_holder,
+        from_contact=from_contact,
         to_holder=to_holder,
+        to_contact=to_contact,
         occurred_at=occurred_at,
     )
 

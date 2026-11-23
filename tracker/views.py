@@ -17,6 +17,7 @@ from django.views.decorators.http import require_POST
 from . import services
 from .forms import (
     ContactForm,
+    desk_value,
     FollowUpForm,
     HandoffForm,
     HolderForm,
@@ -94,10 +95,17 @@ def _add_holder_url(workspace, back_to):
     return _with_params(reverse("holder_create", args=[workspace.pk]), next=back_to)
 
 
-def _holder_from_query(request, workspace):
-    holder_id = request.GET.get("holder", "")
+def _desk_from_query(request, workspace):
+    """Desk picked on another page and passed back as ?contact=<id> or ?holder=<id>."""
+    contact_id, holder_id = request.GET.get("contact", ""), request.GET.get("holder", "")
+    if contact_id.isdigit():
+        contact = Contact.objects.filter(pk=contact_id, holder__workspace=workspace, active=True).first()
+        if contact:
+            return desk_value(contact=contact)
     if holder_id.isdigit():
-        return workspace.holders.filter(pk=holder_id, active=True).first()
+        holder = workspace.holders.filter(pk=holder_id, active=True).first()
+        if holder:
+            return desk_value(holder=holder)
     return None
 
 
@@ -120,7 +128,7 @@ def _selected_workspace(request):
 def _base_tasks(workspace):
     qs = (
         Task.objects.active_workspaces()
-        .select_related("workspace", "stage", "current_holder")
+        .select_related("workspace", "stage", "current_holder", "current_contact__holder")
         .prefetch_related("current_holder__contacts")
     )
     if workspace:
@@ -143,14 +151,14 @@ def dashboard(request):
         open_tasks,
         key=lambda t: (
             0 if t.with_me else 2 if t.current_holder is None else 1,
-            (t.current_holder.name.lower() if t.current_holder else ""),
+            t.desk_name.lower(),
             -t.priority,
         ),
     ):
         if task.with_me:
             label = "On my desk"
         elif task.current_holder:
-            label = task.current_holder.display_name
+            label = task.desk_name
         else:
             label = "Not assigned to anyone"
         if not workspace and task.current_holder:
@@ -242,9 +250,9 @@ def task_create(request, ws_pk):
     workspace = get_object_or_404(Workspace, pk=ws_pk, archived=False)
     if not workspace.stages.exists():
         workspace.create_default_stages()
-    picked = _holder_from_query(request, workspace)
+    picked = _desk_from_query(request, workspace)
     form = TaskForm(request.POST or None, workspace=workspace,
-                    initial={"current_holder": picked.pk} if picked else None)
+                    initial={"current_holder": picked} if picked else None)
     if request.method == "POST" and form.is_valid():
         task = form.save(commit=False)
         task.workspace = workspace
@@ -264,14 +272,14 @@ def task_create(request, ws_pk):
 
 def task_detail(request, pk):
     task = get_object_or_404(
-        Task.objects.select_related("workspace", "stage", "current_holder")
+        Task.objects.select_related("workspace", "stage", "current_holder", "current_contact__holder")
         .prefetch_related("current_holder__contacts"),
         pk=pk,
     )
     updates = task.updates.select_related("from_holder", "to_holder", "from_stage", "to_stage").prefetch_related(
         "from_holder__contacts", "to_holder__contacts"
     )
-    picked = _holder_from_query(request, task.workspace)
+    picked = _desk_from_query(request, task.workspace)
     return render(
         request,
         "tracker/task_detail.html",
@@ -282,7 +290,7 @@ def task_detail(request, pk):
             "add_holder_url": _add_holder_url(task.workspace, task.get_absolute_url()),
             "open_panel": "handoff" if picked else None,
             "update_form": UpdateForm(),
-            "handoff_form": HandoffForm(task=task, initial={"to_holder": picked.pk} if picked else None),
+            "handoff_form": HandoffForm(task=task, initial={"to_holder": picked} if picked else None),
             "stage_form": StageChangeForm(task=task),
             "followup_form": FollowUpForm(
                 initial={"follow_up_date": task.follow_up_date, "follow_up_note": task.follow_up_note}
@@ -351,11 +359,13 @@ def task_handoff(request, pk):
     task = get_object_or_404(Task, pk=pk)
     form = HandoffForm(request.POST, task=task)
     if form.is_valid():
-        holder = form.cleaned_data["to_holder"]
-        services.hand_off(task, holder, form.cleaned_data["note"], form.cleaned_data.get("occurred_at"))
+        holder, contact = form.cleaned_data["to_holder"]
+        services.hand_off(task, holder, form.cleaned_data["note"], form.cleaned_data.get("occurred_at"),
+                          to_contact=contact)
+        who = contact.name if contact else holder.name
         if form.cleaned_data.get("follow_up_date"):
-            services.set_follow_up(task, form.cleaned_data["follow_up_date"], f"Check with {holder.name}")
-        messages.success(request, f"Task handed to {holder.name}.")
+            services.set_follow_up(task, form.cleaned_data["follow_up_date"], f"Check with {who}")
+        messages.success(request, f"Task handed to {task.desk_name}.")
         return redirect(task)
     return _detail_with_errors(request, task, handoff_form=form)
 
@@ -440,8 +450,9 @@ def holder_create(request, ws_pk):
             contact = form.save_into_department()
             dept = contact.holder
             messages.success(request, f"Added {contact.name} to {dept.name}.")
-            url = dept.get_absolute_url()
-            return redirect(_with_params(url, next=back_to) if back_to else url)
+            if back_to:
+                return redirect(_with_params(back_to, contact=contact.pk))
+            return redirect(dept)
         holder = form.save(commit=False)
         holder.workspace = workspace
         holder.save()
@@ -518,7 +529,7 @@ def stage_delete(request, pk):
 def holder_detail(request, pk):
     holder = get_object_or_404(Holder.objects.select_related("workspace"), pk=pk)
     open_tasks = (
-        holder.tasks.open().select_related("workspace", "stage", "current_holder")
+        holder.tasks.open().select_related("workspace", "stage", "current_holder", "current_contact__holder")
         .prefetch_related("current_holder__contacts")
     )
     back_to = _safe_next(request)
@@ -528,6 +539,7 @@ def holder_detail(request, pk):
         {"holder": holder, "workspace": holder.workspace, "contacts": holder.contacts.all(),
          "open_tasks": open_tasks,
          "back_to_task_url": _with_params(back_to, holder=holder.pk) if back_to and holder.active else None,
+         "back_to": back_to,
          "add_person_url": _with_params(reverse("contact_create", args=[holder.pk]), next=back_to)
          if back_to else reverse("contact_create", args=[holder.pk])},
     )

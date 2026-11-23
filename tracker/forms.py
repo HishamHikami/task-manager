@@ -47,6 +47,58 @@ class HolderChoiceField(forms.ModelChoiceField):
         return obj.display_name
 
 
+class DeskChoiceField(forms.ChoiceField):
+    """Pick whose desk a task is on: a whole department, a specific person inside it,
+    or an individual. Values are "h<holder id>" or "c<contact id>"; cleans to
+    a (holder, contact) pair, where contact may be None."""
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("choices", [])
+        super().__init__(*args, **kwargs)
+        self.workspace = None
+
+    def set_workspace(self, workspace, exclude=None):
+        self.workspace = workspace
+        holders = list(workspace.holders.filter(active=True).prefetch_related("contacts"))
+        choices = [("", "---------")]
+        individuals = []
+        for h in holders:
+            if h.is_group:
+                options = [(f"h{h.pk}", f"{h.name} — whole {h.get_kind_display().lower()}")]
+                for c in h.contacts.all():
+                    if c.active:
+                        label = c.name + (f" · {c.role}" if c.role else "") + (" ★" if c.is_primary else "")
+                        options.append((f"c{c.pk}", label))
+                options = [o for o in options if o[0] != exclude]
+                if options:
+                    choices.append((h.name, options))
+            elif f"h{h.pk}" != exclude:
+                individuals.append((f"h{h.pk}", h.name))
+        if individuals:
+            choices.append(("Individuals", individuals))
+        self.choices = choices
+
+    def to_python(self, value):
+        value = super().to_python(value)
+        return f"h{value}" if value.isdigit() else value  # plain holder id still accepted
+
+    def clean(self, value):
+        value = super().clean(value)
+        if not value:
+            return (None, None)
+        pk = int(value[1:])
+        if value[0] == "c":
+            contact = Contact.objects.select_related("holder").get(pk=pk, holder__workspace=self.workspace)
+            return (contact.holder, contact)
+        return (self.workspace.holders.get(pk=pk), None)
+
+
+def desk_value(holder=None, contact=None):
+    if contact:
+        return f"c{contact.pk}"
+    return f"h{holder.pk}" if holder else ""
+
+
 class HolderForm(forms.ModelForm):
     class Meta:
         model = Holder
@@ -128,6 +180,10 @@ class ContactForm(forms.ModelForm):
 
 
 class TaskForm(forms.ModelForm):
+    current_holder = DeskChoiceField(
+        label="Currently with", required=False,
+        help_text="A department, or the specific person in it who has the task.",
+    )
     first_note = forms.CharField(
         label="Background / first note",
         required=False,
@@ -142,7 +198,6 @@ class TaskForm(forms.ModelForm):
             "description",
             "my_role",
             "stage",
-            "current_holder",
             "priority",
             "due_date",
             "follow_up_date",
@@ -154,8 +209,6 @@ class TaskForm(forms.ModelForm):
             "due_date": DateInput(),
             "follow_up_date": DateInput(),
         }
-        labels = {"current_holder": "Currently with"}
-        field_classes = {"current_holder": HolderChoiceField}
 
     field_order = [
         "title", "description", "my_role", "stage", "current_holder", "priority", "due_date",
@@ -166,8 +219,7 @@ class TaskForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.workspace = workspace
         self.fields["stage"].queryset = workspace.stages.all()
-        self.fields["current_holder"].queryset = workspace.holders.filter(active=True).prefetch_related("contacts")
-        self.fields["current_holder"].required = False
+        self.fields["current_holder"].set_workspace(workspace)
         if not self.instance.pk:
             self.fields["stage"].initial = workspace.first_open_stage()
         else:
@@ -179,8 +231,16 @@ class TaskForm(forms.ModelForm):
     def clean(self):
         data = super().clean()
         if data.get("my_role") == "executing" and "current_holder" in self.fields:
-            data["current_holder"] = None  # it's on my own desk
+            data["current_holder"] = (None, None)  # it's on my own desk
         return data
+
+    def save(self, commit=True):
+        task = super().save(commit=False)
+        if "current_holder" in self.fields:
+            task.current_holder, task.current_contact = self.cleaned_data.get("current_holder") or (None, None)
+        if commit:
+            task.save()
+        return task
 
 
 class UpdateForm(forms.ModelForm):
@@ -207,9 +267,9 @@ class UpdateForm(forms.ModelForm):
 
 
 class HandoffForm(forms.Form):
-    to_holder = HolderChoiceField(
-        queryset=Holder.objects.none(), label="Hand to",
-        error_messages={"required": "Choose who the task goes to."},
+    to_holder = DeskChoiceField(
+        label="Hand to", error_messages={"required": "Choose who the task goes to."},
+        help_text="A department, or the specific person in it.",
     )
     note = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))
     occurred_at = forms.DateTimeField(label="When", widget=DateTimeInput(), required=False)
@@ -218,9 +278,8 @@ class HandoffForm(forms.Form):
     def __init__(self, *args, task, **kwargs):
         super().__init__(*args, **kwargs)
         self.task = task
-        self.fields["to_holder"].queryset = (
-            task.workspace.holders.filter(active=True).exclude(pk=task.current_holder_id or 0)
-            .prefetch_related("contacts")
+        self.fields["to_holder"].set_workspace(
+            task.workspace, exclude=desk_value(task.current_holder, task.current_contact)
         )
         self.fields["occurred_at"].initial = timezone.localtime().replace(second=0, microsecond=0)
 

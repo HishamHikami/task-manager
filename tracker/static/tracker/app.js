@@ -22,7 +22,7 @@
 
   function restore() {
     // Only when coming back with a newly added department/person selected.
-    if (!/[?&]holder=\d+/.test(location.search)) return;
+    if (!/[?&](holder|contact)=\d+/.test(location.search)) return;
     document.querySelectorAll("form").forEach(function (form) {
       var key = keyFor(form), raw = null;
       try { raw = sessionStorage.getItem(key); } catch (err) { return; }
