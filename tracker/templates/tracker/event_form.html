@@ -1,0 +1,16 @@
+{% extends "tracker/base.html" %}
+{% block title %}{% if event %}Edit event{% else %}New event{% endif %}{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>{% if event %}Edit event{% else %}Add an event{% endif %} <span class="tag c-{{ workspace.color }}">{{ workspace.name }}</span></h1>
+  <form method="post" class="eventform">
+    {% csrf_token %}
+    {% include "tracker/partials/form_fields.html" %}
+    <div class="actions">
+      <button class="btn btn-primary" type="submit">Save event</button>
+      <a class="btn" href="{% if event %}{{ event.get_absolute_url }}{% else %}{% url 'event_list' %}{% endif %}">Cancel</a>
+      {% if event %}<a class="btn btn-danger right" href="{% url 'event_delete' event.pk %}">Delete</a>{% endif %}
+    </div>
+  </form>
+</div>
+{% endblock %}

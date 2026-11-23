@@ -1,7 +1,7 @@
 from django import forms
 from django.utils import timezone
 
-from .models import Contact, Holder, Stage, Task, Update, Workspace
+from .models import Contact, Event, Holder, Stage, Task, Update, Workspace
 
 
 class DateInput(forms.DateInput):
@@ -296,3 +296,56 @@ class StageChangeForm(forms.Form):
 class FollowUpForm(forms.Form):
     follow_up_date = forms.DateField(label="Follow up on", widget=DateInput(), required=False)
     follow_up_note = forms.CharField(label="What to check", max_length=200, required=False)
+
+
+class EventForm(forms.ModelForm):
+    organizer_desk = DeskChoiceField(
+        label="Organized / invited by", required=False,
+        help_text="A department or person you already track.",
+    )
+
+    class Meta:
+        model = Event
+        fields = [
+            "title", "kind", "my_role", "status", "start", "end", "location", "online_link",
+            "organizer_other", "my_topic", "duration_minutes", "audience", "description", "preparation",
+        ]
+        widgets = {
+            "start": DateTimeInput(),
+            "end": DateTimeInput(),
+            "description": forms.Textarea(attrs={"rows": 3}),
+            "preparation": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    field_order = [
+        "title", "kind", "my_role", "status", "start", "end", "location", "online_link",
+        "organizer_desk", "organizer_other", "my_topic", "duration_minutes", "audience",
+        "description", "preparation",
+    ]
+
+    def __init__(self, *args, workspace, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.workspace = workspace
+        self.fields["organizer_desk"].set_workspace(workspace)
+        if self.instance.pk:
+            self.fields["organizer_desk"].initial = desk_value(
+                self.instance.organizer, self.instance.organizer_contact
+            )
+
+    def clean(self):
+        data = super().clean()
+        start, end = data.get("start"), data.get("end")
+        if start and end and end < start:
+            self.add_error("end", "The end can't be before the start.")
+        return data
+
+    def save(self, commit=True):
+        event = super().save(commit=False)
+        event.organizer, event.organizer_contact = self.cleaned_data.get("organizer_desk") or (None, None)
+        if commit:
+            event.save()
+        return event
+
+
+class EventStatusForm(forms.Form):
+    status = forms.ChoiceField(choices=Event.STATUS_CHOICES)

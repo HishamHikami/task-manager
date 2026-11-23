@@ -34,6 +34,14 @@
 </section>
 {% endif %}
 
+{% if upcoming_events or open_invites %}
+<h2 class="section">Coming up (next 2 weeks){% if open_invites %} · <a href="{% url 'event_list' %}?show=invites">{{ open_invites }} invitation{{ open_invites|pluralize }} to answer</a>{% endif %}</h2>
+<div class="card">
+  {% for event in upcoming_events %}{% include "tracker/partials/event_row.html" %}
+  {% empty %}<p class="muted">No confirmed events in the next two weeks.</p>{% endfor %}
+</div>
+{% endif %}
+
 <h2 class="section">On whose desk</h2>
 {% for holder, tasks in by_holder.items %}
 <div class="card holdergroup">

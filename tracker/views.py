@@ -1,4 +1,6 @@
 from collections import OrderedDict
+from datetime import timedelta
+from datetime import timezone as dt_timezone
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from django.conf import settings
@@ -7,6 +9,7 @@ from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_not_required
 from django.core.cache import cache
 from django.db.models import Count, Q
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -17,6 +20,8 @@ from django.views.decorators.http import require_POST
 from . import services
 from .forms import (
     ContactForm,
+    EventForm,
+    EventStatusForm,
     desk_value,
     FollowUpForm,
     HandoffForm,
@@ -27,7 +32,7 @@ from .forms import (
     UpdateForm,
     WorkspaceForm,
 )
-from .models import Contact, Holder, Stage, Task, Workspace
+from .models import Contact, Event, Holder, Stage, Task, Workspace
 
 
 # --- Login with simple throttling -------------------------------------------------
@@ -165,6 +170,12 @@ def dashboard(request):
             label = f"{label} · {task.workspace.name}"
         by_holder.setdefault(label, []).append(task)
 
+    soon = timezone.now() + timedelta(days=14)
+    upcoming_events = (
+        _events_base(workspace).upcoming().filter(start__lte=soon).exclude(status__in=["declined", "cancelled"])
+        .order_by("start")[:8]
+    )
+    open_invites = _events_base(workspace).upcoming().filter(status="invited").count()
     recent = (
         _base_tasks(workspace).closed().filter(closed_at__isnull=False).order_by("-closed_at")[:5]
     )
@@ -178,6 +189,8 @@ def dashboard(request):
             "by_holder": by_holder,
             "open_count": len(open_tasks),
             "recent_closed": recent,
+            "upcoming_events": upcoming_events,
+            "open_invites": open_invites,
             "today": today,
         },
     )
@@ -584,3 +597,133 @@ def contact_delete(request, pk):
     contact.delete()
     messages.success(request, f"Removed {contact.name}.")
     return redirect(holder)
+
+
+# --- Events -----------------------------------------------------------------------
+
+def _events_base(workspace):
+    qs = Event.objects.filter(workspace__archived=False).select_related(
+        "workspace", "organizer", "organizer_contact__holder"
+    ).prefetch_related("organizer__contacts")
+    return qs.filter(workspace=workspace) if workspace else qs
+
+
+def event_list(request):
+    workspace = _selected_workspace(request)
+    show = request.GET.get("show", "upcoming")
+    qs = _events_base(workspace)
+    if show == "past":
+        events = qs.past().order_by("-start")
+    elif show == "invites":
+        events = qs.filter(status="invited").order_by("start")
+    else:
+        show = "upcoming"
+        events = qs.upcoming().order_by("start")
+    role = request.GET.get("role", "")
+    if role in dict(Event.ROLE_CHOICES):
+        events = events.filter(my_role=role)
+    return render(
+        request, "tracker/event_list.html",
+        {"workspace": workspace, "events": events[:300], "show": show, "role": role,
+         "roles": Event.ROLE_CHOICES, "invite_count": qs.filter(status="invited").count()},
+    )
+
+
+def event_new(request):
+    workspaces = Workspace.objects.filter(archived=False)
+    selected = _selected_workspace(request)
+    if selected:
+        return redirect("event_create", ws_pk=selected.pk)
+    if workspaces.count() == 1:
+        return redirect("event_create", ws_pk=workspaces.first().pk)
+    if not workspaces.exists():
+        messages.info(request, "Create a workspace first.")
+        return redirect("workspace_create")
+    return render(request, "tracker/task_pick_workspace.html",
+                  {"workspaces": workspaces, "for_events": True})
+
+
+def event_create(request, ws_pk):
+    workspace = get_object_or_404(Workspace, pk=ws_pk, archived=False)
+    form = EventForm(request.POST or None, workspace=workspace)
+    if request.method == "POST" and form.is_valid():
+        event = form.save(commit=False)
+        event.workspace = workspace
+        event.save()
+        messages.success(request, "Event saved.")
+        return redirect(event)
+    return render(request, "tracker/event_form.html", {"form": form, "workspace": workspace})
+
+
+def event_detail(request, pk):
+    event = get_object_or_404(_events_base(None), pk=pk)
+    return render(request, "tracker/event_detail.html",
+                  {"event": event, "workspace": event.workspace, "statuses": Event.STATUS_CHOICES})
+
+
+def event_edit(request, pk):
+    event = get_object_or_404(Event, pk=pk)
+    form = EventForm(request.POST or None, instance=event, workspace=event.workspace)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Event saved.")
+        return redirect(event)
+    return render(request, "tracker/event_form.html", {"form": form, "workspace": event.workspace, "event": event})
+
+
+@require_POST
+def event_status(request, pk):
+    event = get_object_or_404(Event, pk=pk)
+    form = EventStatusForm(request.POST)
+    if form.is_valid():
+        event.status = form.cleaned_data["status"]
+        event.save(update_fields=["status", "updated_at"])
+        messages.success(request, f"Marked as: {event.get_status_display()}.")
+    return redirect(event)
+
+
+def event_delete(request, pk):
+    event = get_object_or_404(Event, pk=pk)
+    if request.method == "POST":
+        event.delete()
+        messages.success(request, "Event deleted.")
+        return redirect("event_list")
+    return render(request, "tracker/confirm_delete.html",
+                  {"object": event, "cancel_url": event.get_absolute_url(),
+                   "warning": "This removes the event and its notes. It can't be undone."})
+
+
+def _ics_text(value):
+    return (value or "").replace("\\", "\\\\").replace(";", "\;").replace(",", "\\,").replace("\n", "\\n")
+
+
+def event_ics(request, pk):
+    """Download the event as a calendar file (opens in phone/Outlook/Google calendar)."""
+    event = get_object_or_404(_events_base(None), pk=pk)
+    fmt = "%Y%m%dT%H%M%SZ"
+    start = event.start.astimezone(dt_timezone.utc)
+    end = (event.end or event.start + timedelta(hours=1)).astimezone(dt_timezone.utc)
+    details = [f"My role: {event.get_my_role_display()}"]
+    if event.my_topic:
+        details.append(f"My topic: {event.my_topic}")
+    if event.organizer_name:
+        details.append(f"Organizer: {event.organizer_name}")
+    if event.online_link:
+        details.append(event.online_link)
+    if event.description:
+        details.append(event.description)
+    lines = [
+        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Task Manager//Events//EN", "BEGIN:VEVENT",
+        f"UID:event-{event.pk}@{request.get_host()}",
+        f"DTSTAMP:{timezone.now().astimezone(dt_timezone.utc).strftime(fmt)}",
+        f"DTSTART:{start.strftime(fmt)}", f"DTEND:{end.strftime(fmt)}",
+        f"SUMMARY:{_ics_text(event.title)}",
+        f"LOCATION:{_ics_text(event.location)}",
+        f"DESCRIPTION:{_ics_text(chr(10).join(details))}",
+        "STATUS:" + ("CANCELLED" if event.is_off else "TENTATIVE" if event.status in {"invited", "tentative"}
+                     else "CONFIRMED"),
+        "END:VEVENT", "END:VCALENDAR",
+    ]
+    resp = HttpResponse("\r\n".join(lines) + "\r\n", content_type="text/calendar; charset=utf-8")
+    resp["Content-Disposition"] = f'attachment; filename="event-{event.pk}.ics"'
+    return resp

@@ -1,11 +1,11 @@
 {% extends "tracker/base.html" %}
-{% block title %}New task{% endblock %}
+{% block title %}{% if for_events %}New event{% else %}New task{% endif %}{% endblock %}
 {% block content %}
 <div class="card narrow">
-  <h1>Which workspace is this for?</h1>
+  <h1>Which workspace is this {% if for_events %}event{% else %}task{% endif %} for?</h1>
   <div class="pickgrid">
     {% for ws in workspaces %}
-    <a class="pick c-{{ ws.color }}" href="{% url 'task_create' ws.pk %}">{{ ws.name }}</a>
+    <a class="pick c-{{ ws.color }}" href="{% if for_events %}{% url 'event_create' ws.pk %}{% else %}{% url 'task_create' ws.pk %}{% endif %}">{{ ws.name }}</a>
     {% endfor %}
   </div>
 </div>

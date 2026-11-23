@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from . import services
-from .models import Contact, Holder, Task, Workspace
+from .models import Contact, Event, Holder, Task, Workspace
 
 
 class BaseCase(TestCase):
@@ -487,3 +487,70 @@ class AssignToPersonTests(BaseCase):
         self.ahmed.delete()
         task.refresh_from_db()
         self.assertEqual((task.current_holder, task.current_contact), (self.finance, None))
+
+
+class EventTests(BaseCase):
+    def post_event(self, **extra):
+        start = timezone.localtime() + timedelta(days=3)
+        data = {"title": "Annual community lecture", "kind": "lecture", "my_role": "speaker",
+                "status": "invited", "start": start.strftime("%Y-%m-%dT%H:%M"),
+                "end": (start + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M"),
+                "location": "Main hall", "my_topic": "Leadership and service", "duration_minutes": 30}
+        data.update(extra)
+        return self.client.post(reverse("event_create", args=[self.ws.pk]), data)
+
+    def test_create_event_as_speaker(self):
+        Contact.objects.create(holder=self.gm, name="Dr. Faris", role="Director", is_primary=True)
+        faris = Contact.objects.get(name="Dr. Faris")
+        resp = self.post_event(organizer_desk=f"c{faris.pk}")
+        event = Event.objects.get()
+        self.assertRedirects(resp, event.get_absolute_url())
+        self.assertEqual((event.my_role, event.organizer, event.organizer_contact), ("speaker", self.gm, faris))
+        page = self.client.get(event.get_absolute_url())
+        self.assertContains(page, "Speaker / Lecturer")
+        self.assertContains(page, "Leadership and service")
+        self.assertContains(page, "Dr. Faris · GM Office")
+
+    def test_outside_organizer_text(self):
+        self.post_event(organizer_other="City Cultural Club")
+        self.assertEqual(Event.objects.get().organizer_name, "City Cultural Club")
+
+    def test_end_before_start_rejected(self):
+        start = timezone.localtime() + timedelta(days=1)
+        resp = self.post_event(start=start.strftime("%Y-%m-%dT%H:%M"),
+                               end=(start - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(Event.objects.exists())
+
+    def test_nav_list_and_dashboard(self):
+        self.post_event()
+        self.assertContains(self.client.get(reverse("dashboard")), 'href="/events/"')
+        self.assertContains(self.client.get(reverse("event_list")), "Annual community lecture")
+        dash = self.client.get(reverse("dashboard"))
+        self.assertContains(dash, "Coming up")
+        self.assertContains(dash, "1 invitation to answer")
+        self.assertContains(self.client.get(reverse("event_list") + "?show=invites"), "Annual community lecture")
+
+    def test_status_change(self):
+        self.post_event()
+        event = Event.objects.get()
+        self.client.post(reverse("event_status", args=[event.pk]), {"status": "confirmed"})
+        event.refresh_from_db()
+        self.assertEqual(event.status, "confirmed")
+
+    def test_past_events_listed_separately(self):
+        past = timezone.localtime() - timedelta(days=10)
+        self.post_event(title="Old ceremony", start=past.strftime("%Y-%m-%dT%H:%M"),
+                        end=(past + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M"))
+        self.assertNotContains(self.client.get(reverse("event_list")), "Old ceremony")
+        self.assertContains(self.client.get(reverse("event_list") + "?show=past"), "Old ceremony")
+
+    def test_calendar_file(self):
+        self.post_event(title="Talk, with commas; and semicolons")
+        resp = self.client.get(reverse("event_ics", args=[Event.objects.get().pk]))
+        self.assertEqual(resp["Content-Type"], "text/calendar; charset=utf-8")
+        body = resp.content.decode()
+        self.assertIn("BEGIN:VEVENT", body)
+        self.assertIn("SUMMARY:Talk\\, with commas\; and semicolons", body)
+        self.assertIn("My role: Speaker / Lecturer", body)
+        self.assertIn("STATUS:TENTATIVE", body)

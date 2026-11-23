@@ -1,0 +1,19 @@
+<a class="eventrow {% if event.is_off %}off{% endif %}" href="{{ event.get_absolute_url }}">
+  <div class="datebox">
+    <span class="d">{{ event.start|date:"d" }}</span>
+    <span class="m">{{ event.start|date:"M" }}</span>
+    <span class="t">{{ event.start|date:"H:i" }}</span>
+  </div>
+  <div class="eventrow-main">
+    <span class="taskrow-title">{{ event.title }}</span>
+    <span class="taskrow-meta">
+      <span class="tag c-{{ event.workspace.color }}">{{ event.workspace.name }}</span>
+      <span class="tag role-{{ event.my_role }}">{{ event.get_my_role_display }}</span>
+      {% if event.location %}<span class="muted">📍 {{ event.location }}</span>{% elif event.online_link %}<span class="muted">💻 Online</span>{% endif %}
+    </span>
+    {% if event.my_topic %}<span class="muted topic">🎤 {{ event.my_topic }}</span>{% endif %}
+  </div>
+  <div class="taskrow-dates">
+    <span class="badge status-{{ event.status }}">{{ event.get_status_display }}</span>
+  </div>
+</a>

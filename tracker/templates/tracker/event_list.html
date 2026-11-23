@@ -1,0 +1,28 @@
+{% extends "tracker/base.html" %}
+{% block title %}Events{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <h1>Events{% if workspace %} · {{ workspace.name }}{% endif %}</h1>
+  <a class="btn btn-primary" href="{% url 'event_new' %}">+ New event</a>
+</div>
+<div class="tabs">
+  <a href="?show=upcoming{% if role %}&role={{ role }}{% endif %}" class="{% if show == 'upcoming' %}on{% endif %}">Upcoming</a>
+  <a href="?show=invites{% if role %}&role={{ role }}{% endif %}" class="{% if show == 'invites' %}on{% endif %}">To answer{% if invite_count %} <span class="count">{{ invite_count }}</span>{% endif %}</a>
+  <a href="?show=past{% if role %}&role={{ role }}{% endif %}" class="{% if show == 'past' %}on{% endif %}">Past</a>
+  <form method="get" class="rolefilter">
+    <input type="hidden" name="show" value="{{ show }}">
+    <select name="role" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">
+      <option value="">Any role</option>
+      {% for value, label in roles %}<option value="{{ value }}" {% if role == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </form>
+</div>
+<div class="card">
+  {% for event in events %}
+    {% ifchanged event.start|date:"F Y" %}<h3 class="monthhead">{{ event.start|date:"F Y" }}</h3>{% endifchanged %}
+    {% include "tracker/partials/event_row.html" %}
+  {% empty %}
+    <p class="muted">{% if show == 'past' %}No past events.{% elif show == 'invites' %}No invitations waiting for an answer.{% else %}Nothing coming up. <a href="{% url 'event_new' %}">Add an event</a>.{% endif %}</p>
+  {% endfor %}
+</div>
+{% endblock %}

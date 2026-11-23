@@ -16,12 +16,13 @@
   <nav class="mainnav">
     <a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">Dashboard</a>
     <a href="{% url 'task_list' %}" class="{% if request.resolver_match.url_name == 'task_list' %}active{% endif %}">Tasks</a>
+    <a href="{% url 'event_list' %}" class="{% if 'event' in request.resolver_match.url_name %}active{% endif %}">Events</a>
     <a href="{% url 'workspace_list' %}" class="{% if 'workspace' in request.resolver_match.url_name %}active{% endif %}">Workspaces</a>
   </nav>
   <a class="btn btn-primary btn-new" href="{% url 'task_new' %}">+ New task</a>
   <form method="post" action="{% url 'logout' %}" class="logout">{% csrf_token %}<button class="linklike" type="submit">Log out</button></form>
 </header>
-{% if nav_workspaces and request.resolver_match.url_name in 'dashboard,task_list' %}
+{% if nav_workspaces and request.resolver_match.url_name in 'dashboard,task_list,event_list' %}
 <div class="wsbar">
   <a href="?ws=all" class="chip {% if not nav_selected_ws %}chip-on{% endif %}">All</a>
   {% for ws in nav_workspaces %}

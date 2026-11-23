@@ -63,6 +63,27 @@
     if (e.target.matches && e.target.matches('select[name="kind"], select[name="department"]')) sync();
   });
   document.addEventListener("DOMContentLoaded", sync);
+  document.addEventListener("htmx:afterSwap", sync);
+  document.addEventListener("htmx:afterSettle", sync);
+})();
+
+// Events: "My topic" and speaking time only matter when I'm presenting.
+(function () {
+  var PRESENTING = ["host", "speaker", "panelist", "moderator", "trainer"];
+  function sync() {
+    document.querySelectorAll('form.eventform select[name="my_role"]').forEach(function (select) {
+      var presenting = PRESENTING.indexOf(select.value) !== -1;
+      ["my_topic", "duration_minutes"].forEach(function (name) {
+        var f = select.form.querySelector('[data-field="' + name + '"]');
+        if (f) f.hidden = !presenting;
+      });
+    });
+  }
+  document.addEventListener("change", function (e) {
+    if (e.target.matches && e.target.matches('form.eventform select[name="my_role"]')) sync();
+  });
+  document.addEventListener("DOMContentLoaded", sync);
+  document.addEventListener("htmx:afterSwap", sync);
   document.addEventListener("htmx:afterSettle", sync);
 })();
 
@@ -78,6 +99,7 @@
     if (e.target.matches && e.target.matches('select[name="my_role"]')) sync();
   });
   document.addEventListener("DOMContentLoaded", sync);
+  document.addEventListener("htmx:afterSwap", sync);
   document.addEventListener("htmx:afterSettle", sync);
 })();
 

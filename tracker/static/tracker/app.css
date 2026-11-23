@@ -261,3 +261,35 @@ td .contactlinks { margin-top: 2px; font-size: .85rem; }
 .add-holder { align-self: flex-start; margin-top: 2px; }
 .backbar { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .role-line { display: block; color: var(--muted); font-size: .9rem; margin-top: 2px; }
+
+/* Events */
+.eventrow { display: flex; align-items: center; gap: 12px; padding: 10px 8px; margin: 0 -8px; border-radius: 8px; color: var(--text); flex-wrap: wrap; }
+.eventrow + .eventrow { border-top: 1px solid var(--border); }
+.eventrow:hover { background: var(--bg); text-decoration: none; }
+.eventrow.off { opacity: .55; }
+.eventrow.off .taskrow-title { text-decoration: line-through; }
+.eventrow-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 220px; }
+.datebox { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 54px; flex: 0 0 54px; border: 1px solid var(--border); border-radius: 8px; padding: 4px 0; background: var(--surface); line-height: 1.1; }
+.datebox .d { font-size: 1.2rem; font-weight: 700; }
+.datebox .m { font-size: .72rem; text-transform: uppercase; color: var(--muted); }
+.datebox .t { font-size: .72rem; color: var(--accent); margin-top: 2px; }
+.topic { font-size: .85rem; }
+.monthhead { margin: 14px 0 4px; color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; }
+.monthhead:first-child { margin-top: 0; }
+.status-invited { background: color-mix(in srgb, var(--amber) 18%, transparent); color: var(--amber); }
+.status-tentative { background: var(--bg); color: var(--muted); border: 1px dashed var(--border); }
+.status-confirmed { background: color-mix(in srgb, var(--green) 15%, transparent); color: var(--green); }
+.status-done { background: var(--bg); color: var(--muted); }
+.status-declined, .status-cancelled { background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red); }
+.tag[class*="role-"] { color: var(--c-purple); border-color: color-mix(in srgb, var(--c-purple) 40%, transparent); }
+.myrole { margin: 0 0 6px; }
+.tabs { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.tabs > a { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); }
+.tabs > a.on { background: var(--primary); border-color: var(--primary); color: var(--primary-text); }
+.tabs > a:hover { text-decoration: none; }
+.tabs > a.on .count { color: inherit; }
+.rolefilter { margin: 0 0 0 auto; }
+.rolefilter select { width: auto; }
+.statusbar { display: flex; gap: 6px; flex-wrap: wrap; margin: 0; }
+.prewrap { white-space: pre-wrap; word-break: break-word; }
+.statuslabel { align-self: center; font-size: .9rem; }

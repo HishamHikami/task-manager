@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.core.validators import RegexValidator
 from django.db import models
 from django.urls import reverse
@@ -341,3 +343,119 @@ class Update(models.Model):
 
     def __str__(self):
         return f"{self.get_kind_display()} on {self.task}"
+
+
+class EventQuerySet(models.QuerySet):
+    def upcoming(self):
+        now = timezone.now()
+        return self.filter(models.Q(end__gte=now) | models.Q(end__isnull=True, start__gte=now - timedelta(hours=12)))
+
+    def past(self):
+        now = timezone.now()
+        return self.filter(models.Q(end__lt=now) | models.Q(end__isnull=True, start__lt=now - timedelta(hours=12)))
+
+
+class Event(models.Model):
+    """A meeting, lecture, ceremony, conference, etc. and the part I play in it."""
+
+    ROLE_CHOICES = [
+        ("host", "Host / Organizer"),
+        ("speaker", "Speaker / Lecturer"),
+        ("panelist", "Panelist"),
+        ("moderator", "Moderator / Master of ceremonies"),
+        ("trainer", "Trainer / Workshop leader"),
+        ("guest_honor", "Guest of honor / Chief guest"),
+        ("representative", "Representing my organization"),
+        ("participant", "Participant / Attendee"),
+        ("guest", "Invited guest"),
+        ("volunteer", "Volunteer / Helper"),
+    ]
+    # Roles where I present something, so a topic and preparation matter.
+    PRESENTING_ROLES = {"speaker", "panelist", "moderator", "trainer", "host"}
+
+    STATUS_CHOICES = [
+        ("invited", "Invited — not answered yet"),
+        ("tentative", "Tentative / maybe"),
+        ("confirmed", "Confirmed — I'm going"),
+        ("declined", "Declined"),
+        ("done", "Done — attended"),
+        ("cancelled", "Cancelled by organizer"),
+    ]
+    KIND_CHOICES = [
+        ("meeting", "Meeting"),
+        ("lecture", "Lecture / Talk"),
+        ("conference", "Conference / Forum"),
+        ("workshop", "Workshop / Training"),
+        ("ceremony", "Ceremony / Celebration"),
+        ("religious", "Religious gathering / Program"),
+        ("exhibition", "Exhibition / Fair"),
+        ("visit", "Visit / Tour"),
+        ("social", "Social / Dinner"),
+        ("other", "Other"),
+    ]
+
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name="events")
+    title = models.CharField(max_length=200)
+    kind = models.CharField("Type of event", max_length=12, choices=KIND_CHOICES, default="meeting")
+    my_role = models.CharField("My role", max_length=16, choices=ROLE_CHOICES, default="participant")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="confirmed")
+    start = models.DateTimeField("Starts")
+    end = models.DateTimeField("Ends", null=True, blank=True)
+    location = models.CharField(max_length=200, blank=True, help_text="Venue, address or room.")
+    online_link = models.URLField("Online link", blank=True, help_text="Zoom/Teams/Meet link, if online.")
+    organizer = models.ForeignKey(
+        Holder, on_delete=models.SET_NULL, null=True, blank=True, related_name="events",
+        verbose_name="Organized / invited by",
+    )
+    organizer_contact = models.ForeignKey(
+        "Contact", on_delete=models.SET_NULL, null=True, blank=True, related_name="events"
+    )
+    organizer_other = models.CharField(
+        "…or organizer not in the list", max_length=200, blank=True,
+        help_text="e.g. an outside organization or person you don't track.",
+    )
+    my_topic = models.CharField(
+        "My topic / talk title", max_length=200, blank=True,
+        help_text="What I'm presenting, if I'm speaking, leading or hosting.",
+    )
+    duration_minutes = models.PositiveIntegerField(
+        "My speaking time (minutes)", null=True, blank=True,
+    )
+    audience = models.CharField(max_length=200, blank=True, help_text="Who will attend, expected numbers.")
+    description = models.TextField("Details", blank=True)
+    preparation = models.TextField(
+        "Preparation / to-do", blank=True, help_text="Slides, dress code, gifts, travel, what to bring…"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = EventQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["start"]
+
+    def __str__(self):
+        return self.title
+
+    def get_absolute_url(self):
+        return reverse("event_detail", args=[self.pk])
+
+    @property
+    def is_presenting(self):
+        return self.my_role in self.PRESENTING_ROLES
+
+    @property
+    def organizer_name(self):
+        if self.organizer_contact_id:
+            return desk_label(self.organizer, self.organizer_contact)
+        if self.organizer_id:
+            return self.organizer.display_name
+        return self.organizer_other
+
+    @property
+    def needs_answer(self):
+        return self.status == "invited"
+
+    @property
+    def is_off(self):
+        return self.status in {"declined", "cancelled"}
