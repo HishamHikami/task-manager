@@ -133,3 +133,13 @@ class LoginThrottleTests(TestCase):
             self.client.post(url, {"username": "owner", "password": "wrong"})
         resp = self.client.post(url, {"username": "owner", "password": "a-long-test-password"})
         self.assertEqual(resp.status_code, 429)
+
+
+class AdminLoginTests(TestCase):
+    def test_admin_login_goes_through_throttled_login(self):
+        resp = self.client.get("/admin/login/?next=/admin/")
+        self.assertRedirects(resp, "/login/?next=%2Fadmin%2F", fetch_redirect_response=False)
+
+    def test_admin_index_redirects_anonymous_to_login(self):
+        resp = self.client.get("/admin/", follow=True)
+        self.assertEqual(resp.request["PATH_INFO"], "/login/")

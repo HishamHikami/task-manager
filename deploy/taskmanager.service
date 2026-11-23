@@ -13,6 +13,7 @@ WorkingDirectory=/srv/taskmanager
 ExecStart=/srv/taskmanager/.venv/bin/gunicorn config.wsgi:application \
     --bind unix:/run/taskmanager/gunicorn.sock \
     --umask 007 \
+    --control-socket /run/taskmanager/gunicorn.ctl \
     --workers 1 --threads 4 --worker-class gthread \
     --max-requests 1000 --max-requests-jitter 100 \
     --timeout 60 \

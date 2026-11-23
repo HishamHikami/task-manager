@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib import messages
@@ -7,6 +8,7 @@ from django.contrib.auth.decorators import login_not_required
 from django.core.cache import cache
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_POST
@@ -55,6 +57,14 @@ class ThrottledLoginView(auth_views.LoginView):
     def form_valid(self, form):
         cache.delete(self._key())
         return super().form_valid(form)
+
+
+@login_not_required
+def admin_login_redirect(request):
+    url = reverse("login")
+    if request.GET.get("next"):
+        url += "?" + urlencode({"next": request.GET["next"]})
+    return redirect(url)
 
 
 # --- Helpers ----------------------------------------------------------------------

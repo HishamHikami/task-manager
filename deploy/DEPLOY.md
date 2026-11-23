@@ -34,7 +34,7 @@ cp deploy/taskmanager.service deploy/taskmanager-backup.service deploy/taskmanag
 chmod 755 deploy/*.sh
 systemctl daemon-reload
 systemctl enable --now taskmanager          # creates /var/lib/taskmanager and the socket
-BRANCH=main deploy/update.sh                # static files, migrations, restart
+deploy/update.sh main                        # static files, migrations, restart
 deploy/manage.sh createsuperuser            # your login
 systemctl enable --now taskmanager-backup.timer
 ```
@@ -51,10 +51,11 @@ certbot --nginx -d YOUR.DOMAIN
 ## Updating
 
 ```bash
-BRANCH=main /srv/taskmanager/deploy/update.sh
+/srv/taskmanager/deploy/update.sh main
 ```
 
-It backs up the database first, pulls, installs dependencies, migrates and restarts.
+It backs up the database first, refuses code that adds GitHub workflows, pulls,
+installs dependencies, migrates, restarts and checks the app answers (fails loudly if not).
 
 ## Backups
 

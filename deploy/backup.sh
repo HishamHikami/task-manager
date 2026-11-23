@@ -2,6 +2,7 @@
 # Consistent online backup of the SQLite database, compressed, with rotation.
 # Safe to run while the app is running. Run as root or as the app user.
 set -euo pipefail
+umask 077
 
 DATA_DIR="${DATA_DIR:-/var/lib/taskmanager}"
 BACKUP_DIR="${BACKUP_DIR:-$DATA_DIR/backups}"
