@@ -66,7 +66,11 @@ ThemeData _theme(Brightness b) {
       backgroundColor: dark ? const Color(0xFF161D26) : Colors.white,
       indicatorColor: scheme.primaryContainer,
       labelTextStyle: WidgetStatePropertyAll(
-        base.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
+        base.textTheme.labelSmall?.copyWith(
+          fontWeight: FontWeight.w600,
+          fontSize: 11,
+          letterSpacing: 0,
+        ),
       ),
     ),
     pageTransitionsTheme: const PageTransitionsTheme(
@@ -211,11 +215,18 @@ class _ShellState extends State<Shell> {
               ),
           ],
         ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _index,
-          onDestinationSelected: _select,
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          destinations: _destinations,
+        // Tab labels stay on one line even with a large system font size.
+        bottomNavigationBar: MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: MediaQuery.textScalerOf(context)
+                .clamp(maxScaleFactor: 1.1),
+          ),
+          child: NavigationBar(
+            selectedIndex: _index,
+            onDestinationSelected: _select,
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            destinations: _destinations,
+          ),
         ),
       ),
     );

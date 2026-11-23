@@ -216,78 +216,99 @@ class _CaptureScreenState extends State<CaptureScreen> {
                   ),
                   Row(
                     children: [
-                      PopupMenuButton<int>(
-                        tooltip: 'Workspace',
-                        onSelected: (v) => setState(() => _ws = v),
-                        itemBuilder: (_) => [
-                          for (final w in app.workspaces)
-                            PopupMenuItem(
-                              value: w['id'] as int,
-                              child: Row(
-                                children: [
-                                  Dot(workspaceColor(w['color'] as String?, b)),
-                                  const SizedBox(width: 8),
-                                  Text(w['name'] as String),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Flexible(
+                              child: PopupMenuButton<int>(
+                                tooltip: 'Workspace',
+                                onSelected: (v) => setState(() => _ws = v),
+                                itemBuilder: (_) => [
+                                  for (final w in app.workspaces)
+                                    PopupMenuItem(
+                                      value: w['id'] as int,
+                                      child: Row(
+                                        children: [
+                                          Dot(
+                                            workspaceColor(
+                                              w['color'] as String?,
+                                              b,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(w['name'] as String),
+                                        ],
+                                      ),
+                                    ),
                                 ],
-                              ),
-                            ),
-                        ],
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 7,
-                          ),
-                          decoration: BoxDecoration(
-                            color: cs.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(99),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (_workspace != null) ...[
-                                Dot(
-                                  workspaceColor(
-                                    _workspace!['color'] as String?,
-                                    b,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 7,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: cs.surfaceContainerHighest,
+                                    borderRadius: BorderRadius.circular(99),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (_workspace != null) ...[
+                                        Dot(
+                                          workspaceColor(
+                                            _workspace!['color'] as String?,
+                                            b,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                      ],
+                                      Flexible(
+                                        child: Text(
+                                          _workspace?['name'] as String? ??
+                                              'Workspace',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      const Icon(
+                                        Icons.arrow_drop_down,
+                                        size: 20,
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(width: 6),
-                              ],
-                              Text(
-                                _workspace?['name'] as String? ?? 'Workspace',
-                                style: const TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w600,
-                                ),
                               ),
-                              const Icon(Icons.arrow_drop_down, size: 20),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(width: 6),
+                            FilterChip(
+                              label: const Text('AI'),
+                              avatar: Icon(
+                                Icons.auto_awesome,
+                                size: 16,
+                                color: _useAi && _aiAllowed
+                                    ? cs.onSecondaryContainer
+                                    : cs.outline,
+                              ),
+                              selected: _useAi && _aiAllowed,
+                              showCheckmark: false,
+                              visualDensity: VisualDensity.compact,
+                              tooltip: _aiAllowed
+                                  ? 'Use AI suggestions'
+                                  : (app.aiReady
+                                        ? 'AI is off for this workspace'
+                                        : 'AI isn’t set up'),
+                              onSelected: _aiAllowed
+                                  ? (v) => setState(() => _useAi = v)
+                                  : null,
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      FilterChip(
-                        label: const Text('AI'),
-                        avatar: Icon(
-                          Icons.auto_awesome,
-                          size: 16,
-                          color: _useAi && _aiAllowed
-                              ? cs.onSecondaryContainer
-                              : cs.outline,
-                        ),
-                        selected: _useAi && _aiAllowed,
-                        showCheckmark: false,
-                        visualDensity: VisualDensity.compact,
-                        tooltip: _aiAllowed
-                            ? 'Use AI suggestions'
-                            : (app.aiReady
-                                  ? 'AI is off for this workspace'
-                                  : 'AI isn’t set up'),
-                        onSelected: _aiAllowed
-                            ? (v) => setState(() => _useAi = v)
-                            : null,
-                      ),
-                      const Spacer(),
+                      const SizedBox(width: 8),
                       ValueListenableBuilder<TextEditingValue>(
                         valueListenable: _input,
                         builder: (_, v, _) => AnimatedScale(
